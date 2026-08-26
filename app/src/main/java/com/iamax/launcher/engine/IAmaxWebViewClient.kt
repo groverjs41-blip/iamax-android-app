@@ -1,0 +1,45 @@
+package com.iamax.launcher.engine
+
+import android.graphics.Bitmap
+import android.net.http.SslError
+import android.util.Log
+import android.view.View
+import android.webkit.SslErrorHandler
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.ProgressBar
+
+class IAmaxWebViewClient(
+    private val scriptInjector: ScriptInjector,
+    private val progressBar: ProgressBar,
+    private val onNavigationStateChanged: (url: String, isDashboard: Boolean) -> Unit
+) : WebViewClient() {
+
+    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+        val url = request.url.toString()
+        Log.d("IAmaxWebViewClient", "Loading URL: $url")
+        return false
+    }
+
+    override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+        super.onPageStarted(view, url, favicon)
+        progressBar.visibility = View.VISIBLE
+        val isDashboard = url.startsWith("file:///android_asset/")
+        onNavigationStateChanged(url, isDashboard)
+        scriptInjector.onPageStarted(view, url)
+    }
+
+    override fun onPageFinished(view: WebView, url: String) {
+        super.onPageFinished(view, url)
+        progressBar.visibility = View.GONE
+        val isDashboard = url.startsWith("file:///android_asset/")
+        onNavigationStateChanged(url, isDashboard)
+        scriptInjector.onPageFinished(view, url)
+    }
+
+    override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {
+        // En producción se puede validar el certificado
+        handler?.proceed()
+    }
+}

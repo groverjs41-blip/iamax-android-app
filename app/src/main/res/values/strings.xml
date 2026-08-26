@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">IAmax Launcher</string>
+    <string name="back_to_dashboard">Volver al Dashboard</string>
+    <string name="reload_page">Recargar</string>
+</resources>

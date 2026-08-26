@@ -1,0 +1,77 @@
+/* Protect only sensitive data; generated content remains copy/paste friendly. */
+
+body,
+body div,
+body span,
+body p,
+body article,
+body section,
+body main,
+body li,
+body pre,
+body code,
+body blockquote,
+body textarea,
+body [contenteditable="true"],
+body [role="textbox"] {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+div[data-identifier],
+div[data-identifier] *,
+h1[id="headingText"] > span {
+  -webkit-text-security: disc !important;
+  color: transparent !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8) !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+input[type="email"],
+input[type="password"],
+input[autocomplete="username"],
+input[autocomplete="email"],
+input[autocomplete="current-password"],
+input[autocomplete="new-password"],
+input[autocomplete="one-time-code"],
+input[name*="email" i],
+input[id*="email" i],
+input[name*="user" i],
+input[id*="user" i],
+input[name*="pass" i],
+input[id*="pass" i],
+input[name*="otp" i],
+input[id*="otp" i],
+input[name*="totp" i],
+input[id*="totp" i],
+input[name*="mfa" i],
+input[id*="mfa" i],
+input[name*="2fa" i],
+input[id*="2fa" i],
+input[name*="auth" i],
+input[id*="auth" i],
+input[name*="verification" i],
+input[id*="verification" i],
+input[aria-label*="otp" i],
+input[aria-label*="totp" i],
+input[aria-label*="mfa" i],
+input[aria-label*="2fa" i],
+input[aria-label*="authentication" i],
+input[aria-label*="authenticator" i],
+input[aria-label*="autenticacion" i],
+input[aria-label*="verification" i],
+input[aria-label*="verificacion" i],
+input[placeholder*="otp" i],
+input[placeholder*="totp" i],
+input[placeholder*="mfa" i],
+input[placeholder*="2fa" i],
+input[placeholder*="authentication" i],
+input[placeholder*="authenticator" i],
+input[placeholder*="autenticacion" i],
+input[placeholder*="verification" i],
+input[placeholder*="verificacion" i] {
+  -webkit-text-security: disc !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}

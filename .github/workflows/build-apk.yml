@@ -1,0 +1,41 @@
+name: Build IAmax Android APK
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Compilar APK Android
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio (Checkout)
+        uses: actions/checkout@v4
+
+      - name: Configurar Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Dar permisos de ejecución a Gradlew
+        run: chmod +x gradlew
+
+      - name: Compilar APK (assembleDebug)
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Subir APK compilada como artefacto descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: IAmax-Launcher-v1.3.8-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
