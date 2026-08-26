@@ -26,13 +26,15 @@
 
   window.chrome.runtime = {
     id: "iamax-android-launcher",
+    lastError: null,
     getURL: function(path) {
-      if (!path) return "file:///android_asset/";
+      if (!path) return "https://appassets.androidplatform.net/assets/";
       if (path.startsWith("/")) path = path.substring(1);
-      return "file:///android_asset/" + path;
+      return "https://appassets.androidplatform.net/assets/" + path;
     },
     sendMessage: function(msg, callback) {
       const resp = callBridge(msg);
+      window.chrome.runtime.lastError = null;
       if (typeof callback === "function") {
         setTimeout(function() {
           callback(resp);
@@ -41,11 +43,23 @@
       return Promise.resolve(resp);
     },
     onMessage: {
-      addListener: function(fn) {
-        // Listener shim
-      },
+      addListener: function(fn) {},
       removeListener: function(fn) {}
     }
+  };
+
+  window.chrome.extension = {
+    isAllowedIncognitoAccess: function(callback) {
+      window.chrome.runtime.lastError = null;
+      if (typeof callback === "function") callback(true);
+      return Promise.resolve(true);
+    }
+  };
+
+  window.chrome.action = {
+    setBadgeText: function() {},
+    setBadgeBackgroundColor: function() {},
+    onClicked: { addListener: function() {} }
   };
 
   // Storage shim: connects directly to Android SharedPreferences
@@ -149,6 +163,17 @@
       return Promise.resolve({ id: 1 });
     }
   };
+
+  // Fallback loader auto-hide after 2.5 seconds to prevent frozen overlay
+  document.addEventListener("DOMContentLoaded", function() {
+    setTimeout(function() {
+      const loader = document.getElementById("extensionLoadingScreen");
+      if (loader && !loader.classList.contains("is-leaving")) {
+        console.log("[IAmax Shim] Auto-clearing loading overlay...");
+        loader.classList.add("is-leaving");
+      }
+    }, 2500);
+  });
 
   console.log("[IAmax Shim] Chrome API Shim initialized successfully for Android.");
 })();

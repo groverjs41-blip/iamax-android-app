@@ -50,7 +50,7 @@ class MainActivity : AppCompatActivity() {
         fileUploadCallback = null
     }
 
-    private val dashboardUrl = "file:///android_asset/dashboard/index.html"
+    private val dashboardUrl = "https://appassets.androidplatform.net/assets/dashboard/index.html"
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -87,6 +87,8 @@ class MainActivity : AppCompatActivity() {
         settings.databaseEnabled = true
         settings.allowFileAccess = true
         settings.allowContentAccess = true
+        settings.allowFileAccessFromFileURLs = true
+        settings.allowUniversalAccessFromFileURLs = true
         settings.loadWithOverviewMode = true
         settings.useWideViewPort = true
         settings.setSupportMultipleWindows(false)
@@ -101,6 +103,7 @@ class MainActivity : AppCompatActivity() {
         webView.addJavascriptInterface(bridge, "AndroidBridge")
 
         webView.webViewClient = IAmaxWebViewClient(
+            context = this,
             scriptInjector = scriptInjector,
             progressBar = binding.progressBar,
             onNavigationStateChanged = { _, isDashboard ->
@@ -152,7 +155,7 @@ class MainActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 val currentUrl = binding.webView.url ?: ""
-                val isDashboard = currentUrl.startsWith("file:///android_asset/")
+                val isDashboard = isDashboardUrl(currentUrl)
 
                 if (isDashboard) {
                     finish()
@@ -163,6 +166,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+    }
+
+    private fun isDashboardUrl(url: String): Boolean {
+        return url.startsWith("https://appassets.androidplatform.net/assets/dashboard/") ||
+               url.startsWith("file:///android_asset/dashboard/")
     }
 
     private fun loadDashboard() {
