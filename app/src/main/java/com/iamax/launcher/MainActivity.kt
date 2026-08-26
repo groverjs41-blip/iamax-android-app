@@ -5,8 +5,10 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.webkit.CookieManager
 import android.webkit.ValueCallback
 import android.webkit.WebSettings
+import android.webkit.WebView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -52,7 +54,6 @@ class MainActivity : AppCompatActivity() {
 
     private val dashboardUrl = "https://appassets.androidplatform.net/assets/dashboard/index.html"
 
-    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -66,25 +67,25 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             sessionStorage = sessionStorage,
             cookieInjector = cookieInjector,
-            onNavigateToUrl = { url -> binding.webView.loadUrl(url) },
-            onReturnToDashboard = { loadDashboard() }
+            onNavigateToUrl = { url -> openToolUrl(url) },
+            onReturnToDashboard = { showDashboard() }
         )
 
-        setupWebView()
+        setupDashboardWebView()
+        setupToolWebView()
         setupFloatingBar()
         setupBackNavigation()
 
-        loadDashboard()
+        showDashboard()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun setupWebView() {
-        val webView = binding.webView
+    private fun applyHighSpeedSettings(webView: WebView) {
         val settings = webView.settings
-
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
+        settings.cacheMode = WebSettings.LOAD_DEFAULT
         settings.allowFileAccess = true
         settings.allowContentAccess = true
         settings.allowFileAccessFromFileURLs = true
@@ -95,12 +96,36 @@ class MainActivity : AppCompatActivity() {
         settings.javaScriptCanOpenWindowsAutomatically = true
         settings.mediaPlaybackRequiresUserGesture = false
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        settings.offscreenPreRaster = true
+        settings.safeBrowsingEnabled = false
 
-        // User-Agent estándar para compatibilidad con Google, ChatGPT, Grok
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+
         val defaultUa = settings.userAgentString
         settings.userAgentString = defaultUa.replace("; wv", "")
 
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
+    }
+
+    private fun setupDashboardWebView() {
+        val webView = binding.dashboardWebView
+        applyHighSpeedSettings(webView)
+
         webView.addJavascriptInterface(bridge, "AndroidBridge")
+
+        webView.webViewClient = IAmaxWebViewClient(
+            context = this,
+            scriptInjector = scriptInjector,
+            progressBar = binding.progressBar,
+            onNavigationStateChanged = { _, _ -> }
+        )
+
+        webView.loadUrl(dashboardUrl)
+    }
+
+    private fun setupToolWebView() {
+        val webView = binding.toolWebView
+        applyHighSpeedSettings(webView)
 
         webView.webViewClient = IAmaxWebViewClient(
             context = this,
@@ -133,52 +158,57 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun openToolUrl(url: String) {
+        binding.dashboardWebView.visibility = View.GONE
+        binding.toolWebView.visibility = View.VISIBLE
+        binding.floatingNavBar.visibility = View.VISIBLE
+        binding.toolWebView.loadUrl(url)
+    }
+
+    private fun showDashboard() {
+        binding.toolWebView.visibility = View.GONE
+        binding.dashboardWebView.visibility = View.VISIBLE
+        binding.floatingNavBar.visibility = View.GONE
+        binding.progressBar.visibility = View.GONE
+    }
+
     private fun setupFloatingBar() {
         binding.btnNavBack.setOnClickListener {
-            if (binding.webView.canGoBack()) {
-                binding.webView.goBack()
+            if (binding.toolWebView.canGoBack()) {
+                binding.toolWebView.goBack()
             } else {
-                loadDashboard()
+                showDashboard()
             }
         }
 
         binding.btnNavRefresh.setOnClickListener {
-            binding.webView.reload()
+            binding.toolWebView.reload()
         }
 
         binding.btnNavHome.setOnClickListener {
-            loadDashboard()
+            showDashboard()
         }
     }
 
     private fun setupBackNavigation() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                val currentUrl = binding.webView.url ?: ""
-                val isDashboard = isDashboardUrl(currentUrl)
-
-                if (isDashboard) {
-                    finish()
-                } else if (binding.webView.canGoBack()) {
-                    binding.webView.goBack()
+                if (binding.toolWebView.visibility == View.VISIBLE) {
+                    if (binding.toolWebView.canGoBack()) {
+                        binding.toolWebView.goBack()
+                    } else {
+                        showDashboard()
+                    }
                 } else {
-                    loadDashboard()
+                    finish()
                 }
             }
         })
     }
 
-    private fun isDashboardUrl(url: String): Boolean {
-        return url.startsWith("https://appassets.androidplatform.net/assets/dashboard/") ||
-               url.startsWith("file:///android_asset/dashboard/")
-    }
-
-    private fun loadDashboard() {
-        binding.webView.loadUrl(dashboardUrl)
-    }
-
     override fun onDestroy() {
-        binding.webView.destroy()
+        binding.dashboardWebView.destroy()
+        binding.toolWebView.destroy()
         super.onDestroy()
     }
 }

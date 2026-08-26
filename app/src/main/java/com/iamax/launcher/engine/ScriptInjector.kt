@@ -8,29 +8,46 @@ import java.io.InputStream
 
 class ScriptInjector(private val context: Context) {
 
-    private val scriptCache = mutableMapOf<String, String>()
+    private val preloadedScripts = mutableMapOf<String, String>()
 
-    private fun loadAssetString(path: String): String {
-        return scriptCache.getOrPut(path) {
+    init {
+        // Pre-carga en memoria todos los scripts para que la inyección sea instantánea (0ms de lectura en disco)
+        val scriptPaths = listOf(
+            "scripts/modules/content-client.js",
+            "scripts/shield.css",
+            "scripts/universal_shield.js",
+            "scripts/clear_cache_btn.js",
+            "scripts/spoof.js",
+            "scripts/grok_download.js",
+            "scripts/blocker.js",
+            "scripts/google_shield.js",
+            "scripts/iamax_inject_btn.js",
+            "scripts/gemini_shield.js",
+            "scripts/chatgpt_ip_check.js",
+            "scripts/bot_autologin.js",
+            "scripts/streaming_adblock.js"
+        )
+
+        for (path in scriptPaths) {
             try {
                 context.assets.open(path).use { inputStream: InputStream ->
-                    inputStream.bufferedReader().use { it.readText() }
+                    val content = inputStream.bufferedReader().use { it.readText() }
+                    if (content.isNotBlank()) {
+                        preloadedScripts[path] = Base64.encodeToString(content.toByteArray(), Base64.NO_WRAP)
+                    }
                 }
             } catch (e: Exception) {
-                Log.w("ScriptInjector", "Could not load asset script: $path -> ${e.message}")
-                ""
+                Log.w("ScriptInjector", "Error preloading script: $path -> ${e.message}")
             }
         }
     }
 
     /**
-     * Injects CSS stylesheet into the current page.
+     * Injects CSS stylesheet into the current page instantly using pre-cached base64.
      */
     fun injectCss(webView: WebView, assetPath: String) {
-        val cssContent = loadAssetString(assetPath)
-        if (cssContent.isBlank()) return
+        val encoded = preloadedScripts[assetPath] ?: return
 
-        val encoded = Base64.encodeToString(cssContent.toByteArray(), Base64.NO_WRAP)
         val js = """
             (function() {
                 var parent = document.head || document.documentElement;
@@ -49,13 +66,11 @@ class ScriptInjector(private val context: Context) {
     }
 
     /**
-     * Injects JS file into the WebView.
+     * Injects JS file into the WebView instantly.
      */
     fun injectJs(webView: WebView, assetPath: String) {
-        val jsContent = loadAssetString(assetPath)
-        if (jsContent.isBlank()) return
+        val encoded = preloadedScripts[assetPath] ?: return
 
-        val encoded = Base64.encodeToString(jsContent.toByteArray(), Base64.NO_WRAP)
         val js = """
             (function() {
                 try {
@@ -76,7 +91,8 @@ class ScriptInjector(private val context: Context) {
      * Injects scripts configured for document_start.
      */
     fun onPageStarted(webView: WebView, url: String) {
-        if (url.startsWith("file:///android_asset/")) return
+        if (url.startsWith("https://appassets.androidplatform.net/") ||
+            url.startsWith("file:///android_asset/")) return
 
         val lowerUrl = url.lowercase()
 
@@ -119,7 +135,8 @@ class ScriptInjector(private val context: Context) {
      * Injects scripts configured for document_end / idle.
      */
     fun onPageFinished(webView: WebView, url: String) {
-        if (url.startsWith("file:///android_asset/")) return
+        if (url.startsWith("https://appassets.androidplatform.net/") ||
+            url.startsWith("file:///android_asset/")) return
 
         val lowerUrl = url.lowercase()
 
