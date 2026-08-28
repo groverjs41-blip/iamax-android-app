@@ -1,10 +1,12 @@
 package com.iamax.launcher.bridge
 
 import android.app.Activity
+import android.net.Uri
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import com.google.gson.Gson
+import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.iamax.launcher.engine.CookieInjector
 import com.iamax.launcher.storage.SessionStorage
@@ -31,24 +33,111 @@ class IAmaxBridge(
         return try {
             val message = gson.fromJson(jsonMessage, JsonObject::class.java)
             val type = message.get("type")?.asString ?: ""
-            Log.d("IAmaxBridge", "Received message type: $type")
+            Log.d("IAmaxBridge", "Received message type: $type -> $jsonMessage")
 
             val response = JsonObject()
 
             when (type) {
-                "INJECT_SESSION", "INJECT_CREDENTIALS" -> {
-                    val cookiesElement = message.get("session") ?: message.get("cookies")
-                    val cookiesJson = if (cookiesElement != null) gson.toJson(cookiesElement) else ""
-                    val targetUrl = message.get("url")?.asString ?: message.get("targetUrl")?.asString
+                "INJECT_SESSION" -> {
+                    val targetUrl = message.get("url")?.asString ?: message.get("targetUrl")?.asString ?: ""
+                    
+                    var cookiesJson = ""
+                    if (message.has("sessionData") && !message.get("sessionData").isJsonNull) {
+                        cookiesJson = gson.toJson(message.get("sessionData"))
+                    } else if (message.has("session") && !message.get("session").isJsonNull) {
+                        cookiesJson = gson.toJson(message.get("session"))
+                    } else if (message.has("cookies") && !message.get("cookies").isJsonNull) {
+                        cookiesJson = gson.toJson(message.get("cookies"))
+                    }
 
-                    val success = cookieInjector.injectCookies(cookiesJson, targetUrl)
-                    response.addProperty("success", success)
+                    if (cookiesJson.isNotBlank()) {
+                        cookieInjector.injectCookies(cookiesJson, targetUrl)
+                    }
 
-                    if (targetUrl != null && targetUrl.startsWith("http")) {
+                    response.addProperty("success", true)
+
+                    if (targetUrl.isNotBlank() && targetUrl.startsWith("http")) {
                         activity.runOnUiThread {
                             onNavigateToUrl(targetUrl)
                         }
                     }
+                }
+
+                "CLEAR_AND_OPEN" -> {
+                    val targetUrl = message.get("url")?.asString ?: message.get("targetUrl")?.asString ?: ""
+                    val dontClear = message.get("dontClearCookies")?.asBoolean ?: false
+                    
+                    if (!dontClear && targetUrl.isNotBlank()) {
+                        try {
+                            val domain = Uri.parse(targetUrl).host
+                            cookieInjector.clearCookies(domain)
+                        } catch (_: Exception) {}
+                    }
+
+                    response.addProperty("success", true)
+
+                    if (targetUrl.isNotBlank() && targetUrl.startsWith("http")) {
+                        activity.runOnUiThread {
+                            onNavigateToUrl(targetUrl)
+                        }
+                    }
+                }
+
+                "OPEN_TOOL_WINDOW", "OPEN_TOOL" -> {
+                    val targetUrl = message.get("url")?.asString ?: ""
+                    if (targetUrl.isNotBlank() && targetUrl.startsWith("http")) {
+                        activity.runOnUiThread {
+                            onNavigateToUrl(targetUrl)
+                        }
+                    }
+                    response.addProperty("success", true)
+                }
+
+                "INJECT_CREDENTIALS" -> {
+                    val cardId = message.get("cardId")?.asString ?: ""
+                    val email = message.get("email")?.asString ?: ""
+                    val password = message.get("password")?.asString ?: ""
+                    val totp = message.get("totpCode")?.asString ?: ""
+
+                    if (email.isNotBlank()) sessionStorage.setString("botEmail", email)
+                    if (password.isNotBlank()) sessionStorage.setString("botPassword", password)
+                    if (cardId.isNotBlank()) {
+                        sessionStorage.setString("pending_inject_email_$cardId", email)
+                        sessionStorage.setString("pending_inject_pass_$cardId", password)
+                        sessionStorage.setString("pending_inject_totp_$cardId", totp)
+                    }
+
+                    response.addProperty("success", true)
+                    response.addProperty("message", "Credenciales preparadas para inyección.")
+                }
+
+                "SET_PROFILE_MODULES" -> {
+                    val modules = message.get("modules") ?: JsonArray()
+                    response.addProperty("success", true)
+                    response.add("modules", modules)
+                }
+
+                "GET_PROFILE_MODULES" -> {
+                    val modules = JsonArray().apply {
+                        add("core")
+                        add("session")
+                        add("injector")
+                        add("shield")
+                        add("clear-cache")
+                    }
+                    response.addProperty("success", true)
+                    response.add("modules", modules)
+                }
+
+                "GET_PENDING_INJECT_STATE" -> {
+                    response.addProperty("success", true)
+                    response.addProperty("isOwner", false)
+                    response.addProperty("clientCanInject", true)
+                    response.addProperty("clientInjectMethod", "google")
+                }
+
+                "SET_BLOCKED_SELECTORS", "AUTO_INJECT_NOW", "REVOKE_ACCESS_STATE", "RELOAD_INCOGNITO" -> {
+                    response.addProperty("success", true)
                 }
 
                 "EXTRACT_SESSION" -> {
@@ -56,22 +145,17 @@ class IAmaxBridge(
                     val target = if (url.startsWith("http")) url else "https://$url"
                     val cookiesJson = cookieInjector.extractCookies(target)
                     response.addProperty("success", true)
-                    response.add("cookies", gson.fromJson(cookiesJson, com.google.gson.JsonArray::class.java))
+                    response.add("cookies", gson.fromJson(cookiesJson, JsonArray::class.java))
                 }
 
                 "CLEAR_DOMAIN_CACHE", "CLEAR_DOMAIN_CACHE_NO_COOKIES" -> {
-                    val domain = message.get("domain")?.asString
-                    cookieInjector.clearCookies(domain)
-                    response.addProperty("success", true)
-                }
-
-                "OPEN_TOOL_WINDOW", "OPEN_TOOL" -> {
-                    val url = message.get("url")?.asString ?: ""
-                    if (url.isNotBlank()) {
-                        activity.runOnUiThread {
-                            onNavigateToUrl(url)
-                        }
+                    val urlOrDomain = message.get("url")?.asString ?: message.get("domain")?.asString ?: ""
+                    val domain = if (urlOrDomain.startsWith("http")) {
+                        Uri.parse(urlOrDomain).host
+                    } else {
+                        urlOrDomain
                     }
+                    cookieInjector.clearCookies(domain)
                     response.addProperty("success", true)
                 }
 
@@ -111,7 +195,7 @@ class IAmaxBridge(
 
                 else -> {
                     response.addProperty("success", true)
-                    response.addProperty("message", "Unhandled message type: $type")
+                    response.addProperty("message", "Processed $type")
                 }
             }
 
