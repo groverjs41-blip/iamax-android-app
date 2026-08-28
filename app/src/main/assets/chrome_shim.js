@@ -27,6 +27,14 @@
   window.chrome.runtime = {
     id: "iamax-android-launcher",
     lastError: null,
+    getManifest: function() {
+      return {
+        name: "IAmax Launcher",
+        version: "1.3.8",
+        manifest_version: 3,
+        description: "Dashboard visual de herramientas IA con admin seguro en backend."
+      };
+    },
     getURL: function(path) {
       if (!path) return "https://appassets.androidplatform.net/assets/";
       if (path.startsWith("/")) path = path.substring(1);
@@ -45,6 +53,12 @@
     onMessage: {
       addListener: function(fn) {},
       removeListener: function(fn) {}
+    },
+    onInstalled: {
+      addListener: function(fn) {}
+    },
+    onStartup: {
+      addListener: function(fn) {}
     }
   };
 
@@ -60,6 +74,73 @@
     setBadgeText: function() {},
     setBadgeBackgroundColor: function() {},
     onClicked: { addListener: function() {} }
+  };
+
+  window.chrome.windows = {
+    create: function(createData, callback) {
+      const url = createData ? createData.url : "";
+      if (url) {
+        callBridge({ type: "OPEN_TOOL", url: url });
+      }
+      const win = { id: 1, focused: true };
+      if (typeof callback === "function") callback(win);
+      return Promise.resolve(win);
+    },
+    update: function(winId, updateInfo, callback) {
+      const win = { id: winId || 1 };
+      if (typeof callback === "function") callback(win);
+      return Promise.resolve(win);
+    },
+    remove: function(winId, callback) {
+      if (typeof callback === "function") callback();
+      return Promise.resolve();
+    }
+  };
+
+  window.chrome.cookies = {
+    get: function(details, callback) {
+      if (typeof callback === "function") callback(null);
+      return Promise.resolve(null);
+    },
+    getAll: function(details, callback) {
+      const cookiesResp = callBridge({ type: "EXTRACT_SESSION", url: details?.url || details?.domain || "" });
+      const cookies = cookiesResp?.cookies || [];
+      if (typeof callback === "function") callback(cookies);
+      return Promise.resolve(cookies);
+    },
+    set: function(details, callback) {
+      if (typeof callback === "function") callback(details);
+      return Promise.resolve(details);
+    },
+    remove: function(details, callback) {
+      if (typeof callback === "function") callback(details);
+      return Promise.resolve(details);
+    },
+    getAllCookieStores: function(callback) {
+      const stores = [{ id: "0", tabIds: [1] }];
+      if (typeof callback === "function") callback(stores);
+      return Promise.resolve(stores);
+    }
+  };
+
+  window.chrome.scripting = {
+    executeScript: function(injection, callback) {
+      const res = [{ result: true }];
+      if (typeof callback === "function") callback(res);
+      return Promise.resolve(res);
+    }
+  };
+
+  window.chrome.declarativeNetRequest = {
+    updateDynamicRules: function(options, callback) {
+      if (typeof callback === "function") callback();
+      return Promise.resolve();
+    },
+    getDynamicRules: function(callback) {
+      const rules = [];
+      if (typeof callback === "function") callback(rules);
+      return Promise.resolve(rules);
+    }
   };
 
   // Storage shim: connects directly to Android SharedPreferences
@@ -142,6 +223,11 @@
   };
 
   window.chrome.tabs = {
+    get: function(tabId, callback) {
+      const tab = { id: tabId || 1, url: window.location.href, status: "complete" };
+      if (typeof callback === "function") callback(tab);
+      return Promise.resolve(tab);
+    },
     create: function(createProperties, callback) {
       const url = createProperties ? createProperties.url : "";
       if (url) {
@@ -161,6 +247,14 @@
       }
       if (typeof callback === "function") callback({ id: 1 });
       return Promise.resolve({ id: 1 });
+    },
+    remove: function(tabId, callback) {
+      if (typeof callback === "function") callback();
+      return Promise.resolve();
+    },
+    onUpdated: {
+      addListener: function(fn) {},
+      removeListener: function(fn) {}
     }
   };
 
