@@ -2,6 +2,7 @@ package com.iamax.launcher.engine
 
 import android.net.Uri
 import android.view.View
+import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
@@ -28,5 +29,10 @@ class IAmaxWebChromeClient(
         fileChooserParams: FileChooserParams?
     ): Boolean {
         return onFileChooser(filePathCallback, fileChooserParams)
+    }
+
+    override fun onPermissionRequest(request: PermissionRequest?) {
+        // Automatically grant microphone & media permissions to AI tools (ChatGPT, Gemini, etc.)
+        request?.grant(request.resources)
     }
 }

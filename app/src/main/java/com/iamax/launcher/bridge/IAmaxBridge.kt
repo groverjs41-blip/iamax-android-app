@@ -3,20 +3,28 @@ package com.iamax.launcher.bridge
 import android.app.Activity
 import android.util.Log
 import android.webkit.JavascriptInterface
+import android.webkit.WebView
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.iamax.launcher.engine.CookieInjector
 import com.iamax.launcher.storage.SessionStorage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.net.HttpURLConnection
+import java.net.URL
 
 class IAmaxBridge(
     private val activity: Activity,
     private val sessionStorage: SessionStorage,
     private val cookieInjector: CookieInjector,
+    private val webViewProvider: () -> WebView,
     private val onNavigateToUrl: (url: String) -> Unit,
     private val onReturnToDashboard: () -> Unit
 ) {
 
     private val gson = Gson()
+    private val ioScope = CoroutineScope(Dispatchers.IO)
 
     @JavascriptInterface
     fun handleMessage(jsonMessage: String): String {
@@ -114,6 +122,82 @@ class IAmaxBridge(
             err.addProperty("success", false)
             err.addProperty("error", e.message)
             gson.toJson(err)
+        }
+    }
+
+    /**
+     * Native HTTP Fetch: executes HTTP requests with 0 CORS restrictions directly via Android networking.
+     */
+    @JavascriptInterface
+    fun nativeFetch(urlStr: String, method: String, headersJson: String, body: String, callbackName: String) {
+        ioScope.launch {
+            var status = 0
+            var statusText = ""
+            var responseBody = ""
+            val responseHeaders = mutableMapOf<String, String>()
+
+            try {
+                val url = URL(urlStr)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = method.uppercase()
+                conn.connectTimeout = 15000
+                conn.readTimeout = 20000
+                conn.instanceFollowRedirects = true
+
+                // Apply headers
+                if (headersJson.isNotBlank()) {
+                    try {
+                        val headers = gson.fromJson(headersJson, JsonObject::class.java)
+                        headers.keySet().forEach { key ->
+                            conn.setRequestProperty(key, headers.get(key).asString)
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                // Write payload if POST/PUT/PATCH
+                if (body.isNotBlank() && (method.equals("POST", true) || method.equals("PUT", true) || method.equals("PATCH", true))) {
+                    conn.doOutput = true
+                    conn.outputStream.use { os ->
+                        os.write(body.toByteArray(Charsets.UTF_8))
+                        os.flush()
+                    }
+                }
+
+                status = conn.responseCode
+                statusText = conn.responseMessage ?: ""
+
+                conn.headerFields.forEach { (key, values) ->
+                    if (key != null && values.isNotEmpty()) {
+                        responseHeaders[key.lowercase()] = values.joinToString(", ")
+                    }
+                }
+
+                val stream = if (status in 200..299) conn.inputStream else (conn.errorStream ?: conn.inputStream)
+                responseBody = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
+
+            } catch (e: Exception) {
+                Log.e("IAmaxBridge", "nativeFetch error: ${e.message}", e)
+                status = 500
+                statusText = e.message ?: "Network Error"
+                responseBody = "{\"error\": \"${e.message}\"}"
+            }
+
+            val respObj = JsonObject().apply {
+                addProperty("status", status)
+                addProperty("statusText", statusText)
+                addProperty("body", responseBody)
+                add("headers", gson.toJsonTree(responseHeaders))
+            }
+            val safeJson = gson.toJson(respObj)
+
+            activity.runOnUiThread {
+                try {
+                    val js = "if (window['$callbackName']) { window['$callbackName']($safeJson); }"
+                    webViewProvider().evaluateJavascript(js, null)
+                } catch (e: Exception) {
+                    Log.e("IAmaxBridge", "Callback invocation error: ${e.message}")
+                }
+            }
         }
     }
 

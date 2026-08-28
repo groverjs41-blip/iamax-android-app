@@ -21,6 +21,56 @@
     }
   }
 
+  // Native HTTP Fetch Polyfill for Android (Bypasses all CORS, Preflight and Mixed Content restrictions)
+  const _originalFetch = window.fetch.bind(window);
+
+  window.fetch = async function(resource, init = {}) {
+    const url = typeof resource === "string" ? resource : (resource ? resource.url : "");
+
+    if (bridge && typeof bridge.nativeFetch === "function" && (url.startsWith("http://") || url.startsWith("https://"))) {
+      try {
+        const method = (init.method || "GET").toUpperCase();
+        const headers = init.headers || {};
+        const headersObj = {};
+
+        if (headers instanceof Headers) {
+          headers.forEach((v, k) => { headersObj[k] = v; });
+        } else if (Array.isArray(headers)) {
+          headers.forEach(([k, v]) => { headersObj[k] = v; });
+        } else if (typeof headers === "object") {
+          Object.assign(headersObj, headers);
+        }
+
+        const body = typeof init.body === "string" ? init.body : (init.body ? JSON.stringify(init.body) : "");
+
+        const respObj = await new Promise((resolve) => {
+          const cbName = "_iamax_native_fetch_cb_" + Math.random().toString(36).substring(2) + Date.now();
+          window[cbName] = function(responsePayload) {
+            delete window[cbName];
+            resolve(responsePayload);
+          };
+          bridge.nativeFetch(url, method, JSON.stringify(headersObj), body, cbName);
+        });
+
+        const status = respObj.status || 200;
+        const statusText = respObj.statusText || (status >= 200 && status < 300 ? "OK" : "Error");
+        const respHeaders = new Headers(respObj.headers || {});
+        const responseBody = respObj.body || "";
+
+        return new Response(responseBody, {
+          status: status,
+          statusText: statusText,
+          headers: respHeaders
+        });
+      } catch (err) {
+        console.warn("[IAmax Shim] nativeFetch failed, fallback to standard fetch:", err);
+        return _originalFetch(resource, init);
+      }
+    }
+
+    return _originalFetch(resource, init);
+  };
+
   // Define window.chrome shim
   window.chrome = window.chrome || {};
 
@@ -269,5 +319,5 @@
     }, 2500);
   });
 
-  console.log("[IAmax Shim] Chrome API Shim initialized successfully for Android.");
+  console.log("[IAmax Shim] Chrome API Shim & Native Fetch initialized successfully for Android.");
 })();

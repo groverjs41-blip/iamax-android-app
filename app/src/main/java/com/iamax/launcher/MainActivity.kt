@@ -1,14 +1,19 @@
 package com.iamax.launcher
 
 import android.annotation.SuppressLint
+import android.app.DownloadManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebSettings
 import android.webkit.WebView
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -67,6 +72,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             sessionStorage = sessionStorage,
             cookieInjector = cookieInjector,
+            webViewProvider = { binding.dashboardWebView },
             onNavigateToUrl = { url -> openToolUrl(url) },
             onReturnToDashboard = { showDashboard() }
         )
@@ -105,6 +111,27 @@ class MainActivity : AppCompatActivity() {
         settings.userAgentString = defaultUa.replace("; wv", "")
 
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
+
+        // Native Download Manager
+        webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
+            try {
+                val request = DownloadManager.Request(Uri.parse(url)).apply {
+                    setMimeType(mimeType)
+                    addRequestHeader("User-Agent", userAgent)
+                    addRequestHeader("Cookie", CookieManager.getInstance().getCookie(url))
+                    setDescription("Descargando archivo...")
+                    val fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                    setTitle(fileName)
+                    setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                }
+                val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                dm.enqueue(request)
+                Toast.makeText(this, "Descargando archivo...", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, "Error al descargar: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun setupDashboardWebView() {
