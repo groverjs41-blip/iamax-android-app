@@ -13,8 +13,11 @@ import com.iamax.launcher.storage.SessionStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.net.HttpURLConnection
-import java.net.URL
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.concurrent.TimeUnit
 
 class IAmaxBridge(
     private val activity: Activity,
@@ -27,13 +30,20 @@ class IAmaxBridge(
 
     private val gson = Gson()
     private val ioScope = CoroutineScope(Dispatchers.IO)
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .writeTimeout(20, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .build()
 
     @JavascriptInterface
     fun handleMessage(jsonMessage: String): String {
         return try {
             val message = gson.fromJson(jsonMessage, JsonObject::class.java)
             val type = message.get("type")?.asString ?: ""
-            Log.d("IAmaxBridge", "Received message type: $type -> $jsonMessage")
+            Log.d("IAmaxBridge", "Received message type: $type")
 
             val response = JsonObject()
 
@@ -210,7 +220,7 @@ class IAmaxBridge(
     }
 
     /**
-     * Native HTTP Fetch: executes HTTP requests with 0 CORS restrictions directly via Android networking.
+     * High Performance Native HTTP Fetch using OkHttpClient (Handles TLS 1.3, HTTP/2, GZIP auto-decompression, Zero-CORS)
      */
     @JavascriptInterface
     fun nativeFetch(urlStr: String, method: String, headersJson: String, body: String, callbackName: String) {
@@ -221,46 +231,50 @@ class IAmaxBridge(
             val responseHeaders = mutableMapOf<String, String>()
 
             try {
-                val url = URL(urlStr)
-                val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = method.uppercase()
-                conn.connectTimeout = 15000
-                conn.readTimeout = 20000
-                conn.instanceFollowRedirects = true
+                val reqBuilder = Request.Builder().url(urlStr)
+                val cleanMethod = method.trim().uppercase()
 
                 // Apply headers
                 if (headersJson.isNotBlank()) {
                     try {
-                        val headers = gson.fromJson(headersJson, JsonObject::class.java)
-                        headers.keySet().forEach { key ->
-                            conn.setRequestProperty(key, headers.get(key).asString)
+                        val headersObj = gson.fromJson(headersJson, JsonObject::class.java)
+                        headersObj.keySet().forEach { key ->
+                            val elem = headersObj.get(key)
+                            val value = if (elem.isJsonPrimitive) elem.asString else elem.toString()
+                            if (key.isNotBlank() && value.isNotBlank()) {
+                                reqBuilder.header(key, value)
+                            }
                         }
                     } catch (_: Exception) {}
                 }
 
-                // Write payload if POST/PUT/PATCH
-                if (body.isNotBlank() && (method.equals("POST", true) || method.equals("PUT", true) || method.equals("PATCH", true))) {
-                    conn.doOutput = true
-                    conn.outputStream.use { os ->
-                        os.write(body.toByteArray(Charsets.UTF_8))
-                        os.flush()
+                // Apply Request Body if needed
+                val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+                when (cleanMethod) {
+                    "POST" -> reqBuilder.post(body.toRequestBody(mediaType))
+                    "PUT" -> reqBuilder.put(body.toRequestBody(mediaType))
+                    "PATCH" -> reqBuilder.patch(body.toRequestBody(mediaType))
+                    "DELETE" -> {
+                        if (body.isNotBlank()) reqBuilder.delete(body.toRequestBody(mediaType))
+                        else reqBuilder.delete()
                     }
+                    "HEAD" -> reqBuilder.head()
+                    else -> reqBuilder.get()
                 }
 
-                status = conn.responseCode
-                statusText = conn.responseMessage ?: ""
+                val response = httpClient.newCall(reqBuilder.build()).execute()
+                status = response.code
+                statusText = response.message.ifBlank { if (status in 200..299) "OK" else "Error" }
 
-                conn.headerFields.forEach { (key, values) ->
-                    if (key != null && values.isNotEmpty()) {
-                        responseHeaders[key.lowercase()] = values.joinToString(", ")
-                    }
+                response.headers.forEach { pair ->
+                    responseHeaders[pair.first.lowercase()] = pair.second
                 }
 
-                val stream = if (status in 200..299) conn.inputStream else (conn.errorStream ?: conn.inputStream)
-                responseBody = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
+                // Automatic gzip/deflate decoding by OkHttp body.string()
+                responseBody = response.body?.string() ?: ""
 
             } catch (e: Exception) {
-                Log.e("IAmaxBridge", "nativeFetch error: ${e.message}", e)
+                Log.e("IAmaxBridge", "nativeFetch error on $urlStr: ${e.message}", e)
                 status = 500
                 statusText = e.message ?: "Network Error"
                 responseBody = "{\"error\": \"${e.message}\"}"
