@@ -94,7 +94,9 @@ class TurboCacheInterceptor(private val context: Context) {
                 } catch (_: Exception) {}
 
                 val headers = mutableMapOf<String, String>()
-                okResp.headers.forEach { (k, v) -> headers[k] = v }
+                okResp.headers.forEach { pair ->
+                    headers[pair.first] = pair.second
+                }
                 headers["Access-Control-Allow-Origin"] = "*"
 
                 return WebResourceResponse(mimeType, "UTF-8", okResp.code, "OK", headers, ByteArrayInputStream(bytes))

@@ -22,6 +22,7 @@ import com.iamax.launcher.databinding.ActivityMainBinding
 import com.iamax.launcher.engine.CookieInjector
 import com.iamax.launcher.engine.IAmaxWebChromeClient
 import com.iamax.launcher.engine.IAmaxWebViewClient
+import com.iamax.launcher.engine.NetworkPrewarmer
 import com.iamax.launcher.engine.ScriptInjector
 import com.iamax.launcher.storage.SessionStorage
 
