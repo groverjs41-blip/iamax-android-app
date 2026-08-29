@@ -26,6 +26,7 @@ import com.google.gson.JsonObject
 import com.iamax.launcher.bridge.IAmaxBridge
 import com.iamax.launcher.databinding.ActivityMainBinding
 import com.iamax.launcher.engine.CookieInjector
+import com.iamax.launcher.engine.CredentialInjectorService
 import com.iamax.launcher.engine.IAmaxWebChromeClient
 import com.iamax.launcher.engine.IAmaxWebViewClient
 import com.iamax.launcher.engine.NetworkPrewarmer
@@ -44,6 +45,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sessionStorage: SessionStorage
     private lateinit var cookieInjector: CookieInjector
     private lateinit var scriptInjector: ScriptInjector
+    private lateinit var credentialInjectorService: CredentialInjectorService
     private lateinit var bridge: IAmaxBridge
 
     private val httpClient = OkHttpClient()
@@ -82,12 +84,15 @@ class MainActivity : AppCompatActivity() {
         sessionStorage = SessionStorage(this)
         cookieInjector = CookieInjector()
         scriptInjector = ScriptInjector(this)
+        credentialInjectorService = CredentialInjectorService(this, sessionStorage)
 
         bridge = IAmaxBridge(
             activity = this,
             sessionStorage = sessionStorage,
             cookieInjector = cookieInjector,
+            credentialInjectorService = credentialInjectorService,
             webViewProvider = { binding.dashboardWebView },
+            toolWebViewProvider = { binding.toolWebView },
             onNavigateToUrl = { url -> openToolUrl(url) },
             onReturnToDashboard = { showDashboard() }
         )
@@ -232,34 +237,9 @@ class MainActivity : AppCompatActivity() {
             showDashboard()
         }
 
-        // 1. Inyectar Credenciales
+        // 1. Inyectar Credenciales del Perfil (login_email, login_password, totpCode del perfil activo)
         binding.btnNavInject.setOnClickListener {
-            val email = sessionStorage.getString("botEmail", "")
-            val pass = sessionStorage.getString("botPassword", "")
-            
-            val injectJs = """
-                (function() {
-                    try {
-                        var emailInput = document.querySelector('input[type="email"], input[name="identifier"], input[id="identifierId"], input[name="username"], input[type="text"]');
-                        if (emailInput && '$email') {
-                            emailInput.value = '$email';
-                            emailInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            emailInput.dispatchEvent(new Event('change', { bubbles: true }));
-                        }
-                        var passInput = document.querySelector('input[type="password"], input[name="password"], input[name="Passwd"]');
-                        if (passInput && '$pass') {
-                            passInput.value = '$pass';
-                            passInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            passInput.dispatchEvent(new Event('change', { bubbles: true }));
-                        }
-                    } catch(e) {
-                        console.error('Error auto-filling:', e);
-                    }
-                })();
-            """.trimIndent()
-
-            binding.toolWebView.evaluateJavascript(injectJs, null)
-            Toast.makeText(this, "🔑 Inyectando credenciales en formulario...", Toast.LENGTH_SHORT).show()
+            credentialInjectorService.injectCredentials(binding.toolWebView)
         }
 
         // 2. Limpiar Caché y Cookies

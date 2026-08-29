@@ -9,6 +9,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.iamax.launcher.engine.CookieInjector
+import com.iamax.launcher.engine.CredentialInjectorService
 import com.iamax.launcher.storage.SessionStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,7 +24,9 @@ class IAmaxBridge(
     private val activity: Activity,
     private val sessionStorage: SessionStorage,
     private val cookieInjector: CookieInjector,
+    private val credentialInjectorService: CredentialInjectorService,
     private val webViewProvider: () -> WebView,
+    private val toolWebViewProvider: () -> WebView,
     private val onNavigateToUrl: (url: String) -> Unit,
     private val onReturnToDashboard: () -> Unit
 ) {
@@ -50,7 +53,11 @@ class IAmaxBridge(
             when (type) {
                 "INJECT_SESSION" -> {
                     val targetUrl = message.get("url")?.asString ?: message.get("targetUrl")?.asString ?: ""
-                    
+                    val cardId = message.get("cardId")?.asString ?: ""
+                    if (cardId.isNotBlank()) {
+                        sessionStorage.setString("activeCardId", cardId)
+                    }
+
                     var cookiesJson = ""
                     if (message.has("sessionData") && !message.get("sessionData").isJsonNull) {
                         cookiesJson = gson.toJson(message.get("sessionData"))
@@ -75,8 +82,12 @@ class IAmaxBridge(
 
                 "CLEAR_AND_OPEN" -> {
                     val targetUrl = message.get("url")?.asString ?: message.get("targetUrl")?.asString ?: ""
+                    val cardId = message.get("cardId")?.asString ?: ""
+                    if (cardId.isNotBlank()) {
+                        sessionStorage.setString("activeCardId", cardId)
+                    }
+
                     val dontClear = message.get("dontClearCookies")?.asBoolean ?: false
-                    
                     if (!dontClear && targetUrl.isNotBlank()) {
                         try {
                             val domain = Uri.parse(targetUrl).host
@@ -95,6 +106,11 @@ class IAmaxBridge(
 
                 "OPEN_TOOL_WINDOW", "OPEN_TOOL" -> {
                     val targetUrl = message.get("url")?.asString ?: ""
+                    val cardId = message.get("cardId")?.asString ?: ""
+                    if (cardId.isNotBlank()) {
+                        sessionStorage.setString("activeCardId", cardId)
+                    }
+
                     if (targetUrl.isNotBlank() && targetUrl.startsWith("http")) {
                         activity.runOnUiThread {
                             onNavigateToUrl(targetUrl)
@@ -105,20 +121,36 @@ class IAmaxBridge(
 
                 "INJECT_CREDENTIALS" -> {
                     val cardId = message.get("cardId")?.asString ?: ""
+                    if (cardId.isNotBlank()) {
+                        sessionStorage.setString("activeCardId", cardId)
+                    }
                     val email = message.get("email")?.asString ?: ""
                     val password = message.get("password")?.asString ?: ""
                     val totp = message.get("totpCode")?.asString ?: ""
 
-                    if (email.isNotBlank()) sessionStorage.setString("botEmail", email)
-                    if (password.isNotBlank()) sessionStorage.setString("botPassword", password)
                     if (cardId.isNotBlank()) {
                         sessionStorage.setString("pending_inject_email_$cardId", email)
                         sessionStorage.setString("pending_inject_pass_$cardId", password)
                         sessionStorage.setString("pending_inject_totp_$cardId", totp)
                     }
 
+                    activity.runOnUiThread {
+                        credentialInjectorService.injectCredentials(toolWebViewProvider())
+                    }
+
                     response.addProperty("success", true)
-                    response.addProperty("message", "Credenciales preparadas para inyección.")
+                    response.addProperty("message", "Inyectando credenciales del perfil...")
+                }
+
+                "AUTO_INJECT_NOW" -> {
+                    val cardId = message.get("cardId")?.asString ?: ""
+                    if (cardId.isNotBlank()) {
+                        sessionStorage.setString("activeCardId", cardId)
+                    }
+                    activity.runOnUiThread {
+                        credentialInjectorService.injectCredentials(toolWebViewProvider())
+                    }
+                    response.addProperty("success", true)
                 }
 
                 "SET_PROFILE_MODULES" -> {
@@ -140,13 +172,15 @@ class IAmaxBridge(
                 }
 
                 "GET_PENDING_INJECT_STATE" -> {
+                    val activeId = sessionStorage.getString("activeCardId", "")
                     response.addProperty("success", true)
                     response.addProperty("isOwner", false)
                     response.addProperty("clientCanInject", true)
                     response.addProperty("clientInjectMethod", "google")
+                    response.addProperty("pendingInjectCardId", activeId)
                 }
 
-                "SET_BLOCKED_SELECTORS", "AUTO_INJECT_NOW", "REVOKE_ACCESS_STATE", "RELOAD_INCOGNITO" -> {
+                "SET_BLOCKED_SELECTORS", "REVOKE_ACCESS_STATE", "RELOAD_INCOGNITO" -> {
                     response.addProperty("success", true)
                 }
 
@@ -270,7 +304,6 @@ class IAmaxBridge(
                     responseHeaders[pair.first.lowercase()] = pair.second
                 }
 
-                // Automatic gzip/deflate decoding by OkHttp body.string()
                 responseBody = response.body?.string() ?: ""
 
             } catch (e: Exception) {
