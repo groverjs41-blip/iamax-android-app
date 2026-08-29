@@ -2,6 +2,8 @@ package com.iamax.launcher
 
 import android.annotation.SuppressLint
 import android.app.DownloadManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -12,11 +14,15 @@ import android.webkit.CookieManager
 import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebSettings
+import android.webkit.WebStorage
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.google.gson.Gson
+import com.google.gson.JsonObject
 import com.iamax.launcher.bridge.IAmaxBridge
 import com.iamax.launcher.databinding.ActivityMainBinding
 import com.iamax.launcher.engine.CookieInjector
@@ -25,6 +31,12 @@ import com.iamax.launcher.engine.IAmaxWebViewClient
 import com.iamax.launcher.engine.NetworkPrewarmer
 import com.iamax.launcher.engine.ScriptInjector
 import com.iamax.launcher.storage.SessionStorage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 class MainActivity : AppCompatActivity() {
 
@@ -34,6 +46,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var scriptInjector: ScriptInjector
     private lateinit var bridge: IAmaxBridge
 
+    private val httpClient = OkHttpClient()
+    private val gson = Gson()
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
 
     private val fileChooserLauncher = registerForActivityResult(
@@ -161,7 +175,7 @@ class MainActivity : AppCompatActivity() {
             scriptInjector = scriptInjector,
             progressBar = binding.progressBar,
             onNavigationStateChanged = { _, isDashboard ->
-                binding.floatingNavBar.visibility = if (isDashboard) View.GONE else View.VISIBLE
+                binding.floatingNavBarScroll.visibility = if (isDashboard) View.GONE else View.VISIBLE
             }
         )
 
@@ -190,14 +204,14 @@ class MainActivity : AppCompatActivity() {
     private fun openToolUrl(url: String) {
         binding.dashboardWebView.visibility = View.GONE
         binding.toolWebView.visibility = View.VISIBLE
-        binding.floatingNavBar.visibility = View.VISIBLE
+        binding.floatingNavBarScroll.visibility = View.VISIBLE
         binding.toolWebView.loadUrl(url)
     }
 
     private fun showDashboard() {
         binding.toolWebView.visibility = View.GONE
         binding.dashboardWebView.visibility = View.VISIBLE
-        binding.floatingNavBar.visibility = View.GONE
+        binding.floatingNavBarScroll.visibility = View.GONE
         binding.progressBar.visibility = View.GONE
     }
 
@@ -216,6 +230,84 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnNavHome.setOnClickListener {
             showDashboard()
+        }
+
+        // 1. Inyectar Credenciales
+        binding.btnNavInject.setOnClickListener {
+            val email = sessionStorage.getString("botEmail", "")
+            val pass = sessionStorage.getString("botPassword", "")
+            
+            val injectJs = """
+                (function() {
+                    try {
+                        var emailInput = document.querySelector('input[type="email"], input[name="identifier"], input[id="identifierId"], input[name="username"], input[type="text"]');
+                        if (emailInput && '$email') {
+                            emailInput.value = '$email';
+                            emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            emailInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                        var passInput = document.querySelector('input[type="password"], input[name="password"], input[name="Passwd"]');
+                        if (passInput && '$pass') {
+                            passInput.value = '$pass';
+                            passInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            passInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    } catch(e) {
+                        console.error('Error auto-filling:', e);
+                    }
+                })();
+            """.trimIndent()
+
+            binding.toolWebView.evaluateJavascript(injectJs, null)
+            Toast.makeText(this, "🔑 Inyectando credenciales en formulario...", Toast.LENGTH_SHORT).show()
+        }
+
+        // 2. Limpiar Caché y Cookies
+        binding.btnNavClearCache.setOnClickListener {
+            val currentUrl = binding.toolWebView.url ?: ""
+            if (currentUrl.isNotBlank()) {
+                try {
+                    val domain = Uri.parse(currentUrl).host
+                    cookieInjector.clearCookies(domain)
+                    WebStorage.getInstance().deleteAllData()
+                    binding.toolWebView.clearCache(true)
+                    binding.toolWebView.reload()
+                    Toast.makeText(this, "🧹 Caché y cookies limpiadas para $domain", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Error al limpiar: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        // 3. Verificar IP / Proxy
+        binding.btnNavCheckIp.setOnClickListener {
+            Toast.makeText(this, "🌐 Verificando IP pública y proxy...", Toast.LENGTH_SHORT).show()
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val req = Request.Builder().url("https://api.ipify.org?format=json").build()
+                    val resp = httpClient.newCall(req).execute()
+                    val body = resp.body?.string() ?: ""
+                    val ipObj = gson.fromJson(body, JsonObject::class.java)
+                    val ip = ipObj.get("ip")?.asString ?: "Desconocida"
+
+                    withContext(Dispatchers.Main) {
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle("🌐 Diagnóstico de Red e IP")
+                            .setMessage("Tu dirección IP actual es:\n\n👉 $ip\n\nEstado de Conexión: Activo")
+                            .setPositiveButton("Copiar IP") { _, _ ->
+                                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("IP Proxy", ip))
+                                Toast.makeText(this@MainActivity, "IP copiada al portapapeles", Toast.LENGTH_SHORT).show()
+                            }
+                            .setNegativeButton("Cerrar", null)
+                            .show()
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "No se pudo verificar IP: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
         }
     }
 
