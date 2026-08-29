@@ -24,11 +24,21 @@ class IAmaxWebViewClient(
         .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context))
         .build()
 
+    private val turboCache = TurboCacheInterceptor(context)
+
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+        // 1. Interceptar recursos locales del Dashboard
         val assetResponse = assetLoader.shouldInterceptRequest(request.url)
         if (assetResponse != null) {
             return assetResponse
         }
+
+        // 2. Modo Turbo: Caché ultra-rápido de bundles pesados y bloqueo de rastreadores
+        val turboResponse = turboCache.shouldIntercept(request)
+        if (turboResponse != null) {
+            return turboResponse
+        }
+
         return super.shouldInterceptRequest(view, request)
     }
 

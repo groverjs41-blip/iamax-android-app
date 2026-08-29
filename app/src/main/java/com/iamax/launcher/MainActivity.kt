@@ -83,6 +83,7 @@ class MainActivity : AppCompatActivity() {
         setupBackNavigation()
 
         showDashboard()
+        NetworkPrewarmer.prewarmAll()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
