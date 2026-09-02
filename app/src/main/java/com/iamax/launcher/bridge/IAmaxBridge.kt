@@ -287,9 +287,85 @@ class IAmaxBridge(
     }
 
     /**
-     * Executes an HTTP request with OkHttp (supporting HTTP/2, GZIP/deflate)
-     * bypassing WebView CORS restrictions.
+     * High Performance Native HTTP Fetch using OkHttpClient (Handles TLS 1.3, HTTP/2, GZIP auto-decompression, Zero-CORS)
+     * Called by chrome_shim.js with 5 parameters: url, method, headersJson, body, callbackName
      */
+    @JavascriptInterface
+    fun nativeFetch(urlStr: String, method: String, headersJson: String, body: String, callbackName: String) {
+        ioScope.launch {
+            var status = 0
+            var statusText = ""
+            var responseBody = ""
+            val responseHeaders = mutableMapOf<String, String>()
+
+            try {
+                val reqBuilder = Request.Builder().url(urlStr)
+                val cleanMethod = method.trim().uppercase()
+
+                // Apply headers
+                if (headersJson.isNotBlank()) {
+                    try {
+                        val headersObj = gson.fromJson(headersJson, JsonObject::class.java)
+                        headersObj.keySet().forEach { key ->
+                            val elem = headersObj.get(key)
+                            val value = if (elem.isJsonPrimitive) elem.asString else elem.toString()
+                            if (key.isNotBlank() && value.isNotBlank()) {
+                                reqBuilder.header(key, value)
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                // Apply Request Body if needed
+                val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+                when (cleanMethod) {
+                    "POST" -> reqBuilder.post(body.toRequestBody(mediaType))
+                    "PUT" -> reqBuilder.put(body.toRequestBody(mediaType))
+                    "PATCH" -> reqBuilder.patch(body.toRequestBody(mediaType))
+                    "DELETE" -> {
+                        if (body.isNotBlank()) reqBuilder.delete(body.toRequestBody(mediaType))
+                        else reqBuilder.delete()
+                    }
+                    "HEAD" -> reqBuilder.head()
+                    else -> reqBuilder.get()
+                }
+
+                val response = httpClient.newCall(reqBuilder.build()).execute()
+                status = response.code
+                statusText = response.message.ifBlank { if (status in 200..299) "OK" else "Error" }
+
+                response.headers.forEach { pair ->
+                    responseHeaders[pair.first.lowercase()] = pair.second
+                }
+
+                responseBody = response.body?.string() ?: ""
+
+            } catch (e: Exception) {
+                Log.e("IAmaxBridge", "nativeFetch error on $urlStr: ${e.message}", e)
+                status = 500
+                statusText = e.message ?: "Network Error"
+                responseBody = "{\"error\": \"${e.message}\"}"
+            }
+
+            val respObj = JsonObject().apply {
+                addProperty("status", status)
+                addProperty("statusText", statusText)
+                addProperty("body", responseBody)
+                add("headers", gson.toJsonTree(responseHeaders))
+            }
+            val safeJson = gson.toJson(respObj)
+
+            activity.runOnUiThread {
+                try {
+                    val js = "if (window['$callbackName']) { window['$callbackName']($safeJson); }"
+                    webViewProvider().evaluateJavascript(js, null)
+                } catch (e: Exception) {
+                    Log.e("IAmaxBridge", "Callback invocation error: ${e.message}")
+                }
+            }
+        }
+    }
+
     @JavascriptInterface
     fun nativeFetch(url: String, optionsJson: String): String {
         return try {

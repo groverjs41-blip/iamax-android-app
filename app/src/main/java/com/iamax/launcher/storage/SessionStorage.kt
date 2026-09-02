@@ -22,6 +22,10 @@ class SessionStorage(context: Context) {
         prefs.edit().remove(key).apply()
     }
 
+    fun clear() {
+        prefs.edit().clear().apply()
+    }
+
     fun removeMultiple(keys: List<String>) {
         val editor = prefs.edit()
         keys.forEach { editor.remove(it) }
