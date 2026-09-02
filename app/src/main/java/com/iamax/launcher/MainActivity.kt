@@ -145,6 +145,31 @@ class MainActivity : AppCompatActivity() {
 
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
 
+        // Menú contextual para descargar imágenes, videos o audios al mantener presionado
+        webView.setOnLongClickListener {
+            val result = webView.hitTestResult
+            val extra = result.extra
+            if (extra.isNullOrBlank()) return@setOnLongClickListener false
+
+            when (result.type) {
+                WebView.HitTestResult.IMAGE_TYPE,
+                WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE -> {
+                    showDownloadConfirmationDialog("imagen", extra)
+                    true
+                }
+                WebView.HitTestResult.SRC_ANCHOR_TYPE -> {
+                    val lower = extra.lowercase()
+                    if (lower.endsWith(".mp3") || lower.endsWith(".mp4") || lower.endsWith(".pdf") ||
+                        lower.endsWith(".zip") || lower.endsWith(".wav") || lower.endsWith(".xlsx") ||
+                        lower.endsWith(".csv") || lower.endsWith(".webm") || lower.contains("download")) {
+                        showDownloadConfirmationDialog("archivo", extra)
+                        true
+                    } else false
+                }
+                else -> false
+            }
+        }
+
         // Native Download Manager (Handles HTTP, HTTPS, blob:, and data: URIs)
         webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
             try {
@@ -175,19 +200,8 @@ class MainActivity : AppCompatActivity() {
                     return@setDownloadListener
                 }
 
-                val request = DownloadManager.Request(Uri.parse(url)).apply {
-                    setMimeType(mimeType)
-                    addRequestHeader("User-Agent", userAgent)
-                    addRequestHeader("Cookie", CookieManager.getInstance().getCookie(url))
-                    setDescription("Descargando archivo...")
-                    val fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
-                    setTitle(fileName)
-                    setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                    setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-                }
-                val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                dm.enqueue(request)
-                Toast.makeText(this, "Descargando archivo...", Toast.LENGTH_SHORT).show()
+                val fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                showDownloadConfirmationDialog("archivo", url)
             } catch (e: Exception) {
                 Toast.makeText(this, "Error al descargar: ${e.message}", Toast.LENGTH_SHORT).show()
             }
@@ -322,6 +336,67 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Toast.makeText(this, "Error al descargar: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    fun showDownloadConfirmationDialog(typeLabel: String, mediaUrl: String) {
+        runOnUiThread {
+            try {
+                val fileName = URLUtil.guessFileName(mediaUrl, null, null)
+                AlertDialog.Builder(this)
+                    .setTitle("Descargar $typeLabel")
+                    .setMessage("¿Deseas descargar este $typeLabel en la carpeta Descargas?\n\n$fileName")
+                    .setPositiveButton("Descargar") { _, _ ->
+                        if (mediaUrl.startsWith("data:")) {
+                            val mime = if (mediaUrl.contains(";base64")) mediaUrl.substring(5, mediaUrl.indexOf(";base64")) else "image/png"
+                            saveBase64Direct(mediaUrl, fileName, mime)
+                        } else {
+                            downloadDirect(mediaUrl, fileName)
+                        }
+                    }
+                    .setNegativeButton("Cancelar", null)
+                    .show()
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error in showDownloadConfirmationDialog: ${e.message}")
+            }
+        }
+    }
+
+    fun saveBase64Direct(dataUri: String, fileName: String, mime: String) {
+        try {
+            val commaIdx = dataUri.indexOf(',')
+            val raw = if (commaIdx != -1) dataUri.substring(commaIdx + 1) else dataUri
+            val bytes = android.util.Base64.decode(raw, android.util.Base64.DEFAULT)
+            val finalName = if (!fileName.contains(".")) {
+                when {
+                    mime.contains("audio") || mime.contains("mpeg") || mime.contains("mp3") -> "$fileName.mp3"
+                    mime.contains("video") || mime.contains("mp4") -> "$fileName.mp4"
+                    mime.contains("jpeg") || mime.contains("jpg") -> "$fileName.jpg"
+                    mime.contains("webp") -> "$fileName.webp"
+                    else -> "$fileName.png"
+                }
+            } else fileName
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                val values = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, finalName)
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mime)
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                }
+                val uri = contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                if (uri != null) {
+                    contentResolver.openOutputStream(uri)?.use { os -> os.write(bytes) }
+                }
+            } else {
+                val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                dir.mkdirs()
+                val file = java.io.File(dir, finalName)
+                file.outputStream().use { os -> os.write(bytes) }
+                android.media.MediaScannerConnection.scanFile(this, arrayOf(file.absolutePath), arrayOf(mime), null)
+            }
+            Toast.makeText(this, "Guardado en Descargas: $finalName", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error al guardar: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 

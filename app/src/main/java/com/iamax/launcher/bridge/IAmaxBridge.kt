@@ -420,29 +420,89 @@ class IAmaxBridge(
         }
     }
 
+    private val chunkMap = java.util.concurrent.ConcurrentHashMap<String, java.io.ByteArrayOutputStream>()
+
+    @JavascriptInterface
+    fun saveBase64Chunk(transferId: String, index: Int, total: Int, chunk: String, fileName: String, mimeType: String) {
+        try {
+            val stream = chunkMap.getOrPut(transferId) { java.io.ByteArrayOutputStream() }
+            val commaIdx = chunk.indexOf(',')
+            val raw = if (commaIdx != -1) chunk.substring(commaIdx + 1) else chunk
+            val bytes = android.util.Base64.decode(raw, android.util.Base64.DEFAULT)
+            stream.write(bytes)
+
+            if (index >= total - 1) {
+                chunkMap.remove(transferId)
+                saveRawBytes(stream.toByteArray(), fileName, mimeType)
+            }
+        } catch (e: Exception) {
+            Log.e("IAmaxBridge", "Error saving chunk: ${e.message}", e)
+        }
+    }
+
     @JavascriptInterface
     fun saveBase64File(base64Data: String, fileName: String, mimeType: String) {
         try {
             val commaIdx = base64Data.indexOf(',')
             val rawBase64 = if (commaIdx != -1) base64Data.substring(commaIdx + 1) else base64Data
             val bytes = android.util.Base64.decode(rawBase64, android.util.Base64.DEFAULT)
+            saveRawBytes(bytes, fileName, mimeType)
+        } catch (e: Exception) {
+            Log.e("IAmaxBridge", "Error saving base64 file: ${e.message}", e)
+            activity.runOnUiThread {
+                Toast.makeText(activity, "Error al guardar archivo: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
+    private fun saveRawBytes(bytes: ByteArray, fileName: String, mimeType: String) {
+        try {
+            val lowerMime = mimeType.lowercase()
             val safeFileName = if (fileName.isNotBlank()) fileName else "descarga_${System.currentTimeMillis()}"
             val finalFileName = if (!safeFileName.contains(".")) {
                 when {
-                    mimeType.contains("png") -> "$safeFileName.png"
-                    mimeType.contains("jpeg") || mimeType.contains("jpg") -> "$safeFileName.jpg"
-                    mimeType.contains("webp") -> "$safeFileName.webp"
-                    mimeType.contains("pdf") -> "$safeFileName.pdf"
-                    mimeType.contains("json") -> "$safeFileName.json"
+                    lowerMime.contains("audio") || lowerMime.contains("mpeg") || lowerMime.contains("mp3") -> "$safeFileName.mp3"
+                    lowerMime.contains("wav") -> "$safeFileName.wav"
+                    lowerMime.contains("m4a") || lowerMime.contains("aac") -> "$safeFileName.m4a"
+                    lowerMime.contains("ogg") -> "$safeFileName.ogg"
+                    lowerMime.contains("video") || lowerMime.contains("mp4") -> "$safeFileName.mp4"
+                    lowerMime.contains("webm") -> "$safeFileName.webm"
+                    lowerMime.contains("png") -> "$safeFileName.png"
+                    lowerMime.contains("jpeg") || lowerMime.contains("jpg") -> "$safeFileName.jpg"
+                    lowerMime.contains("webp") -> "$safeFileName.webp"
+                    lowerMime.contains("gif") -> "$safeFileName.gif"
+                    lowerMime.contains("pdf") -> "$safeFileName.pdf"
+                    lowerMime.contains("json") -> "$safeFileName.json"
+                    lowerMime.contains("csv") -> "$safeFileName.csv"
+                    lowerMime.contains("zip") -> "$safeFileName.zip"
+                    lowerMime.contains("excel") || lowerMime.contains("spreadsheet") -> "$safeFileName.xlsx"
                     else -> "$safeFileName.bin"
                 }
             } else safeFileName
 
+            val resolvedMime = when {
+                finalFileName.endsWith(".mp3") -> "audio/mpeg"
+                finalFileName.endsWith(".wav") -> "audio/wav"
+                finalFileName.endsWith(".m4a") -> "audio/mp4"
+                finalFileName.endsWith(".ogg") -> "audio/ogg"
+                finalFileName.endsWith(".mp4") -> "video/mp4"
+                finalFileName.endsWith(".webm") -> "video/webm"
+                finalFileName.endsWith(".png") -> "image/png"
+                finalFileName.endsWith(".jpg") || finalFileName.endsWith(".jpeg") -> "image/jpeg"
+                finalFileName.endsWith(".webp") -> "image/webp"
+                finalFileName.endsWith(".gif") -> "image/gif"
+                finalFileName.endsWith(".pdf") -> "application/pdf"
+                finalFileName.endsWith(".json") -> "application/json"
+                finalFileName.endsWith(".csv") -> "text/csv"
+                finalFileName.endsWith(".xlsx") -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                finalFileName.endsWith(".zip") -> "application/zip"
+                else -> if (mimeType.isNotBlank()) mimeType else "application/octet-stream"
+            }
+
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                 val values = android.content.ContentValues().apply {
                     put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, finalFileName)
-                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, if (mimeType.isNotBlank()) mimeType else "application/octet-stream")
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, resolvedMime)
                     put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
                 }
                 val uri = activity.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
@@ -456,15 +516,16 @@ class IAmaxBridge(
                 downloadsDir.mkdirs()
                 val file = java.io.File(downloadsDir, finalFileName)
                 file.outputStream().use { os -> os.write(bytes) }
+                android.media.MediaScannerConnection.scanFile(activity, arrayOf(file.absolutePath), arrayOf(resolvedMime), null)
             }
 
             activity.runOnUiThread {
-                android.widget.Toast.makeText(activity, "Archivo guardado en Descargas: $finalFileName", android.widget.Toast.LENGTH_LONG).show()
+                Toast.makeText(activity, "Descargado en Descargas: $finalFileName", Toast.LENGTH_LONG).show()
             }
         } catch (e: Exception) {
-            Log.e("IAmaxBridge", "Error saving base64 file: ${e.message}", e)
+            Log.e("IAmaxBridge", "Error in saveRawBytes: ${e.message}", e)
             activity.runOnUiThread {
-                android.widget.Toast.makeText(activity, "Error al guardar archivo: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                Toast.makeText(activity, "Error al guardar archivo: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }

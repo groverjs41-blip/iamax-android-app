@@ -65,12 +65,12 @@ class IAmaxWebViewClient(
         val isDownloadExt = ext.isNotBlank() && downloadableExtensions.contains(ext)
         val hasDownloadParam = lower.contains("download=true") || lower.contains("download=1") ||
                                lower.contains("/download/") || lower.contains("/export/") ||
-                               lower.contains("export=true")
+                               lower.contains("export=true") || lower.contains("format=mp3") ||
+                               lower.contains("format=wav") || lower.contains("type=audio")
 
         if (isDownloadExt || hasDownloadParam) {
-            val fileName = URLUtil.guessFileName(url, null, null)
             (context as? MainActivity)?.let { mainAct ->
-                mainAct.downloadDirect(url, fileName)
+                mainAct.showDownloadConfirmationDialog("archivo", url)
                 return true
             }
         }
