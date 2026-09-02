@@ -134,6 +134,7 @@ class ScriptInjector(private val context: Context) {
         injectJs(webView, "scripts/universal_shield.js")
         injectJs(webView, "scripts/clear_cache_btn.js")
         injectJs(webView, "scripts/auto_injector.js")
+        injectJs(webView, "scripts/blob_downloader.js")
 
         // Spoof check exclusions (Google, Cloudflare, reCAPTCHA, ArkoseLabs nunca deben recibir spoof.js)
         val isExcludedSpoof = lowerUrl.contains("scribd.com") ||

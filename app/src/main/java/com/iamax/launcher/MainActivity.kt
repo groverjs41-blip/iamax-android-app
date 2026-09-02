@@ -144,9 +144,36 @@ class MainActivity : AppCompatActivity() {
 
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
 
-        // Native Download Manager
+        // Native Download Manager (Handles HTTP, HTTPS, blob:, and data: URIs)
         webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
             try {
+                if (url.startsWith("blob:") || url.startsWith("data:")) {
+                    val guessName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                    webView.evaluateJavascript(
+                        """
+                        (function() {
+                            var blobUrl = '$url';
+                            fetch(blobUrl)
+                                .then(function(r) { return r.blob(); })
+                                .then(function(blob) {
+                                    var reader = new FileReader();
+                                    reader.onloadend = function() {
+                                        var base64data = reader.result;
+                                        if (window.AndroidBridge && typeof window.AndroidBridge.saveBase64File === 'function') {
+                                            window.AndroidBridge.saveBase64File(base64data, '$guessName', blob.type || '$mimeType');
+                                        }
+                                    };
+                                    reader.readAsDataURL(blob);
+                                })
+                                .catch(function(err) {
+                                    console.error('Blob fetch error:', err);
+                                });
+                        })();
+                        """.trimIndent(), null
+                    )
+                    return@setDownloadListener
+                }
+
                 val request = DownloadManager.Request(Uri.parse(url)).apply {
                     setMimeType(mimeType)
                     addRequestHeader("User-Agent", userAgent)
@@ -187,6 +214,8 @@ class MainActivity : AppCompatActivity() {
     private fun setupToolWebView() {
         val webView = binding.toolWebView
         applyHighSpeedSettings(webView)
+
+        webView.addJavascriptInterface(bridge, "AndroidBridge")
 
         webView.webViewClient = IAmaxWebViewClient(
             context = this,

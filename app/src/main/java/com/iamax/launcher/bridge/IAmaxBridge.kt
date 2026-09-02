@@ -374,6 +374,29 @@ class IAmaxBridge(
                     response.addProperty("success", true)
                 }
 
+                "DOWNLOAD_GROK_ASSET" -> {
+                    val assetUrl = message.get("url")?.asString ?: ""
+                    val filename = message.get("filename")?.asString ?: "archivo-grok"
+                    if (assetUrl.isNotBlank()) {
+                        activity.runOnUiThread {
+                            try {
+                                val request = android.app.DownloadManager.Request(Uri.parse(assetUrl)).apply {
+                                    setTitle(filename)
+                                    setDescription("Descargando archivo...")
+                                    setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                    setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, filename)
+                                }
+                                val dm = activity.getSystemService(android.content.Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                                dm.enqueue(request)
+                                android.widget.Toast.makeText(activity, "Descargando: $filename", android.widget.Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                android.widget.Toast.makeText(activity, "Error al descargar: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                    response.addProperty("success", true)
+                }
+
                 else -> {
                     Log.w("IAmaxBridge", "Unhandled message type: $type")
                     response.addProperty("warning", "Unhandled message type: $type")
@@ -387,6 +410,55 @@ class IAmaxBridge(
             val errResponse = JsonObject()
             errResponse.addProperty("error", e.message)
             gson.toJson(errResponse)
+        }
+    }
+
+    @JavascriptInterface
+    fun saveBase64File(base64Data: String, fileName: String, mimeType: String) {
+        try {
+            val commaIdx = base64Data.indexOf(',')
+            val rawBase64 = if (commaIdx != -1) base64Data.substring(commaIdx + 1) else base64Data
+            val bytes = android.util.Base64.decode(rawBase64, android.util.Base64.DEFAULT)
+
+            val safeFileName = if (fileName.isNotBlank()) fileName else "descarga_${System.currentTimeMillis()}"
+            val finalFileName = if (!safeFileName.contains(".")) {
+                when {
+                    mimeType.contains("png") -> "$safeFileName.png"
+                    mimeType.contains("jpeg") || mimeType.contains("jpg") -> "$safeFileName.jpg"
+                    mimeType.contains("webp") -> "$safeFileName.webp"
+                    mimeType.contains("pdf") -> "$safeFileName.pdf"
+                    mimeType.contains("json") -> "$safeFileName.json"
+                    else -> "$safeFileName.bin"
+                }
+            } else safeFileName
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                val values = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, finalFileName)
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, if (mimeType.isNotBlank()) mimeType else "application/octet-stream")
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+                }
+                val uri = activity.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                if (uri != null) {
+                    activity.contentResolver.openOutputStream(uri)?.use { os ->
+                        os.write(bytes)
+                    }
+                }
+            } else {
+                val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                downloadsDir.mkdirs()
+                val file = java.io.File(downloadsDir, finalFileName)
+                file.outputStream().use { os -> os.write(bytes) }
+            }
+
+            activity.runOnUiThread {
+                android.widget.Toast.makeText(activity, "Archivo guardado en Descargas: $finalFileName", android.widget.Toast.LENGTH_LONG).show()
+            }
+        } catch (e: Exception) {
+            Log.e("IAmaxBridge", "Error saving base64 file: ${e.message}", e)
+            activity.runOnUiThread {
+                android.widget.Toast.makeText(activity, "Error al guardar archivo: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

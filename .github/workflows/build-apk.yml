@@ -7,6 +7,9 @@ on:
     branches: [ "**" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Compilar APK Android
@@ -34,10 +37,23 @@ jobs:
       - name: Compilar APK (assembleDebug)
         run: ./gradlew assembleDebug --stacktrace --no-daemon
 
+      - name: Renombrar APK para descarga directa
+        run: cp app/build/outputs/apk/debug/app-debug.apk IAmax-Launcher-v1.3.8.apk
+
       - name: Subir APK compilada como artefacto descargable
         uses: actions/upload-artifact@v4
         with:
           name: IAmax-Launcher-v1.3.8-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: IAmax-Launcher-v1.3.8.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publicar Release directa con APK
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: v1.3.8
+          name: IAmax Launcher v1.3.8
+          files: IAmax-Launcher-v1.3.8.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
