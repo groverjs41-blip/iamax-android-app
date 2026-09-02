@@ -1,4 +1,4 @@
-// Auto-acceso al Bot WhatsApp desde IAmax (extension / iframe)
+// Auto-acceso al Bot WhatsApp desde IAmax (desktop / iframe)
 (function () {
   const BOT_HOST_PATTERN = /iamaxbackenv2|botiamax-production/i;
   if (!BOT_HOST_PATTERN.test(window.location.hostname)) return;
@@ -52,17 +52,20 @@
     if (!checkLoginInputs()) return;
 
     try {
-      const session = await chrome.storage.session.get(["botEmail", "botPassword"]);
-      const local = await chrome.storage.local.get(["botEmail", "botPassword", "ownerToken"]);
+      const storage = window.chrome?.storage;
+      if (!storage) return;
+
+      const session = await storage.session.get(["botEmail", "botPassword"]);
+      const local = await storage.local.get(["botEmail", "botPassword", "ownerToken"]);
       const botEmail = session.botEmail || local.botEmail;
       const botPassword = session.botPassword || local.botPassword;
 
       if (local.botEmail || local.botPassword) {
-        await chrome.storage.session.set({
+        await storage.session.set({
           botEmail: botEmail || "",
           botPassword: botPassword || ""
         });
-        await chrome.storage.local.remove(["botEmail", "botPassword"]);
+        await storage.local.remove(["botEmail", "botPassword"]);
       }
 
       if (local.ownerToken) {

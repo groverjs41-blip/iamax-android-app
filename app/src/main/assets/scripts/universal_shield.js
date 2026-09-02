@@ -89,18 +89,44 @@ document.addEventListener('cut', protectSensitiveCopy, true);
 document.addEventListener('dragstart', protectSensitiveCopy, true);
 document.addEventListener('click', blockPasswordReveal, true);
 
-// 1. Hide sensitive inputs so they look like passwords
+function isGoogleAppShell() {
+    try {
+        const h = String(location.hostname || '').toLowerCase();
+        // No tocar UI de Gemini ya logueado (evita texto negro / rarezas en el chat)
+        if (/^gemini\.google\.|^aistudio\.google\.|^notebooklm\.google\.|^labs\.google/i.test(h)) return true;
+        return false;
+    } catch (e) {
+        return false;
+    }
+}
+
+// 1. Hide sensitive inputs so they look like passwords (solo en login, no en apps)
 function hideInputs() {
+    if (isGoogleAppShell()) return;
+    // En páginas de app sin form de login, no enmascarar nada
+    try {
+        const path = String(location.pathname || '');
+        if (/\/app(\/|$)/i.test(path) && !/accounts\.google/i.test(location.hostname || '')) return;
+    } catch (e) {}
+
     const sensitiveInputs = document.querySelectorAll(sensitiveInputSelector);
     sensitiveInputs.forEach(el => {
         if (el.type !== 'hidden') {
+            // Solo password/OTP en pantallas de login — no email genérico en SPAs
+            const t = String(el.type || '').toLowerCase();
+            const meta = [el.name, el.id, el.autocomplete, el.placeholder].join(' ').toLowerCase();
+            const isPassOrOtp = t === 'password' || /pass|otp|totp|2fa|mfa|auth/.test(meta);
+            if (!isPassOrOtp) return;
             if (el.style.webkitTextSecurity !== "disc") {
                 el.style.setProperty('-webkit-text-security', 'disc', 'important');
             }
         }
     });
 
-    const accountRoots = document.querySelectorAll('[data-identifier], [data-email], button[aria-haspopup="menu"], [data-testid*="account" i], [data-testid*="profile" i]');
+    // Solo en accounts.google.com censurar chips de email en texto
+    if (!/accounts\.google\./i.test(String(location.hostname || ''))) return;
+
+    const accountRoots = document.querySelectorAll('[data-identifier], [data-email]');
     accountRoots.forEach(root => {
         [root, ...root.querySelectorAll('*')].forEach(element => {
             if (element.children.length > 0) return;
@@ -129,13 +155,6 @@ observer.observe((document.documentElement || document), {
 
 let autoSubmitted = false;
 let injectionRequested = false;
-let iamaxAccessRevoked = false;
-
-chrome.runtime.onMessage.addListener((message) => {
-    if (message?.type !== "IAMAX_ACCESS_REVOKED") return;
-    iamaxAccessRevoked = true;
-    injectionRequested = true;
-});
 
 function checkIfFilledAndSubmit() {
     if (autoSubmitted) return;
@@ -152,26 +171,21 @@ function checkIfFilledAndSubmit() {
     }
 }
 
-function isCloudflareChallengeActive() {
-    const challengeFrame = document.querySelector('iframe[src*="challenges.cloudflare.com"], iframe[src*="turnstile"]');
-    const pageText = String(document.body?.innerText || '').toLowerCase();
-    const challengeText = /just a moment|verifying|verificando|checking your browser|comprobando|verifique que es un ser humano|verificar que usted es un ser humano|security verification|verificaci[oó]n de seguridad|un momento/.test(pageText);
-    return Boolean(challengeFrame || challengeText);
-}
-
 function requestInjection() {
-    if (injectionRequested || iamaxAccessRevoked) return;
+    if (injectionRequested) return;
 
     const readStorage = (keys, callback) => {
-        const sessionApi = chrome.storage.session;
+        const sessionApi = chrome.storage?.session;
+        const localApi = chrome.storage?.local;
         if (!sessionApi) {
-            chrome.storage.local.get(keys, callback);
+            localApi.get(keys, callback);
             return;
         }
         sessionApi.get(keys, (sessionRes) => {
-            const missing = keys.filter((key) => sessionRes[key] === undefined);
+            const normalized = Array.isArray(keys) ? keys : [keys];
+            const missing = normalized.filter((key) => sessionRes[key] === undefined);
             if (!missing.length) return callback(sessionRes);
-            chrome.storage.local.get(missing, (localRes) => {
+            localApi.get(missing, (localRes) => {
                 const merged = { ...sessionRes, ...localRes };
                 const toMigrate = {};
                 missing.forEach((key) => {
@@ -179,27 +193,19 @@ function requestInjection() {
                 });
                 if (!Object.keys(toMigrate).length) return callback(merged);
                 sessionApi.set(toMigrate, () => {
-                    chrome.storage.local.remove(Object.keys(toMigrate), () => callback(merged));
+                    localApi.remove(Object.keys(toMigrate), () => callback(merged));
                 });
             });
         });
     };
 
-    readStorage(["pendingInjectCardId", "verificationCompatibility"], (res) => {
-        if (!res.pendingInjectCardId) return;
-
-        const verificationCompatible = Boolean(res.verificationCompatibility);
-        const scheduleInjection = () => {
-            if (injectionRequested || iamaxAccessRevoked) return;
-            if (verificationCompatible && isCloudflareChallengeActive()) {
-                setTimeout(scheduleInjection, 1500);
-                return;
-            }
+    readStorage(["pendingInjectCardId"], (res) => {
+        if (res.pendingInjectCardId) {
             injectionRequested = true;
-            chrome.runtime.sendMessage({ type: "AUTO_INJECT_NOW" });
-        };
-
-        setTimeout(scheduleInjection, verificationCompatible ? 500 : 1000);
+            setTimeout(() => {
+                chrome.runtime.sendMessage({ type: "AUTO_INJECT_NOW" });
+            }, 1000);
+        }
     });
 }
 

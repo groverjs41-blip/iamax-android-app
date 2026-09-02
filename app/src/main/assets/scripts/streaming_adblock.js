@@ -1,10 +1,8 @@
 (() => {
-let iamaxStreamingEnabled = false;
 // Streaming AdBlocker
 // Remueve overlays, popups invisibles y banners molestos en sitios de streaming.
 
 function runAdBlocker() {
-  if (!iamaxStreamingEnabled) return;
   // Lista de selectores CSS comunes para ads y popups
   const selectors = [
     'iframe[src*="ads"]',
@@ -66,10 +64,7 @@ function runAdBlocker() {
 }
 
 // Ejecutar rápido al cargar
-globalThis.iamaxModules?.isEnabled?.("streaming-clean").then((enabled) => {
-  iamaxStreamingEnabled = Boolean(enabled);
-  if (iamaxStreamingEnabled) runAdBlocker();
-});
+runAdBlocker();
 
 // Ejecutar periódicamente porque algunos sitios recrean los anuncios
 setInterval(runAdBlocker, 2000);
@@ -79,7 +74,7 @@ const observer = new MutationObserver((mutations) => {
   runAdBlocker();
 });
 
-observer.observe(document.documentElement, {
+observer.observe((document.documentElement || document), {
   childList: true,
   subtree: true
 });

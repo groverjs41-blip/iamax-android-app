@@ -1,60 +1,46 @@
 <!doctype html>
 <html lang="es">
   <head>
-    <meta charset="UTF-8" />
     <script src="../chrome_shim.js"></script>
+    <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#060a18" />
     <title>IAmax Dashboard</title>
     <link rel="stylesheet" href="./dashboard.css" />
+    <script>
+      window.addEventListener('error', function(e) {
+        alert("ERROR GLOBAL: " + e.message + " en " + e.filename + ":" + e.lineno);
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        alert("ERROR ASYNC: " + (e.reason && e.reason.message ? e.reason.message : e.reason));
+      });
+    </script>
   </head>
   <body class="client-dashboard">
-    <div id="extensionLoadingScreen" class="extension-loading-screen" role="status" aria-live="polite" aria-label="Cargando IAmax">
-      <div class="extension-loading-glow" aria-hidden="true"></div>
-      <section class="extension-loading-card">
-        <div class="extension-loading-brand">
-          <span class="brand-mark">IA</span>
-          <div>
-            <p class="eyebrow">IAmax Workspace</p>
-            <h1>Preparando tus perfiles</h1>
-          </div>
-        </div>
-
-        <div class="extension-loading-profiles" aria-hidden="true">
-          <div class="loading-profile-card is-active">
-            <span class="loading-profile-avatar">IA</span>
-            <span class="loading-profile-copy"><i></i><i></i></span>
-            <b></b>
-          </div>
-          <div class="loading-profile-card">
-            <span class="loading-profile-avatar">01</span>
-            <span class="loading-profile-copy"><i></i><i></i></span>
-            <b></b>
-          </div>
-          <div class="loading-profile-card">
-            <span class="loading-profile-avatar">02</span>
-            <span class="loading-profile-copy"><i></i><i></i></span>
-            <b></b>
-          </div>
-        </div>
-
-        <div class="extension-loading-progress" aria-hidden="true"><span></span></div>
-        <p id="extensionLoadingText" class="extension-loading-text">Cargando perfiles y sesiones...</p>
-      </section>
+    <div id="updateBanner" class="update-banner hidden">
+      <span class="update-icon" aria-hidden="true">!</span>
+      <span class="update-text" id="updateBannerText">Hay una nueva version de IAmax disponible.</span>
+      <div class="update-progress hidden" id="updateProgress" aria-live="polite">
+        <span class="update-progress-track"><span id="updateProgressFill"></span></span>
+        <span id="updateProgressLabel">0%</span>
+      </div>
+      <button id="updateBannerLink" class="iamax-btn primary small" type="button">Actualizar ahora</button>
+      <button id="installUpdateButton" class="iamax-btn primary small hidden" type="button">Reiniciar e instalar</button>
+      <button id="closeUpdateBanner" class="close-update-btn" type="button" aria-label="Cerrar aviso">&times;</button>
     </div>
 
     <div id="killSwitchOverlay" class="login-overlay hidden" style="z-index: 99999; background: rgba(1, 3, 10, 0.95); flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 20px;">
       <div style="background: rgba(255, 0, 85, 0.1); border: 1px solid var(--danger); padding: 40px; border-radius: 16px; max-width: 400px;">
         <h1 style="color: var(--danger); margin-bottom: 16px; font-size: 1.5rem;">Actualizacion obligatoria</h1>
-        <p style="color: var(--muted); margin-bottom: 24px; line-height: 1.5;">Tu version de la extension IAmax es demasiado antigua y ya no es compatible. Descarga e instala la nueva version para continuar.</p>
-        <a id="killSwitchLink" href="#" target="_blank" class="iamax-btn primary" style="width: 100%; justify-content: center;">Descargar nueva version</a>
+        <p style="color: var(--muted); margin-bottom: 24px; line-height: 1.5;">Tu version de IAmax es demasiado antigua y ya no es compatible. Actualiza para continuar.</p>
+        <a id="killSwitchLink" href="#" target="_blank" class="iamax-btn primary" style="width: 100%; justify-content: center;">Actualizar ahora</a>
       </div>
     </div>
 
     <div id="loginOverlay" class="login-overlay">
       <section class="login-brand-panel" aria-label="IAmax">
         <div class="login-brand">
-          <span class="brand-mark">IA</span>
+          <img src="./assets/logo.png" style="width: 60px; height: 60px; border-radius: 12px; object-fit: contain; background: #fff;" alt="Logo" />
           <div>
             <p class="eyebrow">IAmax</p>
             <h1>IAmax</h1>
@@ -62,36 +48,36 @@
         </div>
 
         <div class="login-copy">
-          <p class="eyebrow">Acceso privado</p>
-          <h2>CRM e IAs en un solo panel.</h2>
+          <p class="eyebrow">IAmax Intelligence Hub</p>
+          <h2>Todo el poder de la IA, en un solo panel.</h2>
           <p>
-            WhatsApp, contactos, flujos y asistentes de IA para vender y atender
-            sin cambiar de herramienta, desde escritorio o celular.
+            Perfiles aislados, sesiones protegidas y las mejores herramientas de IA
+            organizadas por suscripción Estándar y Ultra.
           </p>
         </div>
 
         <div class="login-proof-grid" aria-label="Resumen">
           <div>
-            <strong>CRM</strong>
-            <span>Contactos y chats</span>
+            <strong>Seguro</strong>
+            <span>Perfiles aislados</span>
           </div>
           <div>
-            <strong>IAs</strong>
-            <span>Asistentes listos</span>
+            <strong>Estándar</strong>
+            <span>Herramientas esenciales</span>
           </div>
           <div>
-            <strong>Flujos</strong>
-            <span>Automatizaciones</span>
+            <strong>Ultra</strong>
+            <span>Catálogo completo</span>
           </div>
         </div>
       </section>
 
       <section class="login-form-panel" aria-label="Iniciar sesión">
-        <form id="unifiedLoginForm" class="login-card">
+        <form id="unifiedLoginForm" class="login-card" autocomplete="off">
           <div class="login-card-head">
             <p class="eyebrow">Acceso seguro</p>
             <h2>Iniciar sesión</h2>
-            <p>Ingresa con tu correo y contraseña de IAmax.</p>
+            <p>Accede a tu catálogo personal con tu correo y contraseña.</p>
           </div>
 
           <label class="field" for="unifiedEmailInput">
@@ -114,7 +100,8 @@
                 class="unified-input"
                 type="password"
                 placeholder="Tu contraseña"
-                autocomplete="current-password"
+                name="iamax_password_ephemeral"
+                autocomplete="off"
                 required
               />
               <button id="togglePasswordBtn" class="icon-button" type="button" aria-label="Mostrar contraseña">
@@ -126,8 +113,7 @@
             </span>
           </label>
 
-          <div id="unified2faContainer" style="display: none;">
-            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px; margin-top: 12px;">Se requiere código de verificación (2FA).</p>
+          <div id="unified2faContainer" class="hidden">
             <label class="field" for="unified2faInput">
               Código 2FA
               <input
@@ -136,20 +122,57 @@
                 type="text"
                 placeholder="123456"
                 autocomplete="one-time-code"
+                inputmode="numeric"
+                maxlength="6"
+                pattern="[0-9]{6}"
               />
             </label>
+            <button id="cancelUnified2faBtn" class="login-secondary-action" type="button">
+              Volver a correo y contraseña
+            </button>
           </div>
 
           <div class="remember-session-field">
             <label class="remember-session-toggle" for="unifiedRememberSessionInput">
               <input id="unifiedRememberSessionInput" type="checkbox" checked />
-              <span>Recordar sesión</span>
+              <span>Recordar correo</span>
             </label>
-            <small class="remember-session-help">Mantiene tu acceso activo por 30 días en este dispositivo.</small>
+            <small class="remember-session-help">Guarda solo tu correo. Nunca guarda la contraseña ni inicia sesión automáticamente.</small>
           </div>
 
           <button id="unifiedLoginBtn" class="unified-btn" type="submit">Ingresar</button>
+          
+          <div class="login-register-block">
+            <span>¿Todavía no tienes una cuenta?</span>
+            <button type="button" id="registerAccountBtn" class="login-register-btn">Registrarse</button>
+            <small>Crea tu cuenta aquí mismo. No abriremos otro navegador.</small>
+          </div>
+
           <p id="unifiedLoginError" class="form-error" role="alert"></p>
+        </form>
+
+        <form id="inlineSignupForm" class="login-card signup-card hidden" autocomplete="off">
+          <div class="login-card-head signup-card-head">
+            <button id="backToLoginBtn" class="signup-back-btn" type="button" aria-label="Volver a iniciar sesión">← Volver</button>
+            <p class="eyebrow">Nuevo acceso IAmax</p>
+            <h2>Crear mi cuenta</h2>
+            <p>Regístrate para explorar el catálogo. Tu acceso a herramientas se activa al elegir Estándar o Ultra.</p>
+          </div>
+          <label class="field" for="signupBusinessInput">Nombre o negocio
+            <input id="signupBusinessInput" class="unified-input" type="text" placeholder="Tu nombre o negocio" maxlength="120" />
+          </label>
+          <label class="field" for="signupEmailInput">Correo electrónico
+            <input id="signupEmailInput" class="unified-input" type="email" placeholder="tu@correo.com" autocomplete="email" required />
+          </label>
+          <label class="field" for="signupPasswordInput">Crear contraseña
+            <input id="signupPasswordInput" class="unified-input" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password" minlength="6" required />
+          </label>
+          <label class="field" for="signupPasswordConfirmInput">Confirmar contraseña
+            <input id="signupPasswordConfirmInput" class="unified-input" type="password" placeholder="Repite tu contraseña" autocomplete="new-password" minlength="6" required />
+          </label>
+          <div class="signup-security-note"><span>◆</span><p>Tus datos están protegidos y encriptados.</p></div>
+          <button id="inlineSignupBtn" class="unified-btn signup-submit-btn" type="submit">Crear cuenta</button>
+          <p id="inlineSignupFeedback" class="form-error" role="status"></p>
         </form>
       </section>
     </div>
@@ -190,17 +213,22 @@
       </button>
       <section id="notificationPanel" class="notification-panel hidden" aria-label="Notificaciones">
         <h3>Notificaciones</h3>
-        <div id="notificationEmpty" class="notification-empty">No hay notificaciones nuevas.</div>
-        <p id="notificationLabel" class="notification-label hidden">Actualizacion version</p>
-        <article id="notificationUpdateCard" class="notification-card hidden">
+        <div id="notificationEmpty" class="notification-empty hidden">No hay notificaciones nuevas.</div>
+        <p id="notificationLabel" class="notification-label">Actualizacion version</p>
+        <article id="notificationUpdateCard" class="notification-card">
           <h4 id="notificationTitle">Cambios disponibles</h4>
           <ol id="notificationList">
-            <li>Actualizacion 1.3.0: inyeccion Google/Gemini y ventana flotante.</li>
-            <li>Bot WhatsApp y perfiles FLOW mas estables.</li>
-            <li>Aviso DEBES ACTUALIZAR en rojo para versiones antiguas.</li>
-            <li>Actualiza a 1.3.0 para seguir usando IAmax.</li>
+            <li>Mejoras en Lovable y herramientas.</li>
+            <li>Menos avisos al abrir.</li>
+            <li>Sesion mas estable.</li>
+            <li>Actualiza a 1.3.3 para seguir usando IAmax.</li>
           </ol>
-          <button id="notificationUpdateAction" class="notification-action" type="button">Descargar</button>
+          <div class="notification-progress hidden" id="notificationProgress" aria-live="polite">
+            <span class="notification-progress-track"><span id="notificationProgressFill"></span></span>
+            <span id="notificationProgressLabel">0%</span>
+          </div>
+          <button id="notificationUpdateAction" class="notification-action" type="button">Actualizar ahora</button>
+          <button id="notificationInstallAction" class="notification-action hidden" type="button">Reiniciar e instalar</button>
         </article>
         <footer class="notification-footer">
           <button id="notificationHistory" type="button">Historial &gt;</button>
@@ -251,7 +279,7 @@
       <aside class="sidebar" aria-label="Navegacion principal">
         <div class="sidebar-header">
           <div class="sidebar-brand-row">
-            <span class="brand-mark brand-mark-small">IA</span>
+            <img src="./assets/logo.png" style="width: 40px; height: 40px; border-radius: 8px; object-fit: contain; background: #fff;" alt="Logo" />
             <div>
               <img src="" id="sidebarLogo" class="sidebar-logo" alt="Logo del panel" />
               <h2 id="brandTitle">IAmax Dashboard</h2>
@@ -268,20 +296,12 @@
                 <path d="M7 11V8a5 5 0 0 1 10 0v3"></path>
               </svg>
               <span>
-                <strong>Authenticator 2FA</strong>
-                <small>Codigos activos</small>
+                <strong>Centro de códigos</strong>
+                <small>Administrado por el Owner</small>
               </span>
             </button>
 
-            <button id="openStreamingButton" class="nav-category shortcut-card shortcut-streaming" type="button">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <polygon points="7 4 20 12 7 20 7 4"></polygon>
-              </svg>
-              <span>
-                <strong>Streaming</strong>
-                <small>Perfiles premium</small>
-              </span>
-            </button>
+            
 
             <button id="openMetodosButton" class="nav-category shortcut-card shortcut-metodos" type="button">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -303,6 +323,7 @@
                 <small>Centro de mensajes</small>
               </span>
             </button>
+
           </div>
 
           <div class="sidebar-section-label">Categorias</div>
@@ -310,8 +331,9 @@
         </div>
 
         <div class="sidebar-footer">
-          <button id="openOwnerPanelBtn" class="ghost-button hidden" type="button" style="color: #fcd34d; margin-bottom: 8px;">⚙️ Panel de Dueño</button>
+          <button id="openOwnerPanelBtn" class="ghost-button owner-panel-button hidden" type="button">Panel de Dueño</button>
           <button id="openConfigButton" class="ghost-button hidden" type="button">Configuracion</button>
+          <button id="logoutButton" class="ghost-button" type="button" style="color: #ff4d4d; border-color: rgba(255, 77, 77, 0.2);">Cerrar sesión</button>
         </div>
       </aside>
 
@@ -339,6 +361,12 @@
               </svg>
               <input id="searchInput" type="search" placeholder="Buscar herramienta..." autocomplete="off" />
             </label>
+            <button id="reloadAppBtn" type="button" class="icon-button" style="margin-left: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 6px; color: #a1a1aa; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;" title="Recargar panel" aria-label="Recargar panel" onmouseover="this.style.background='rgba(255,255,255,0.1)'; this.style.color='#fff';" onmouseout="this.style.background='rgba(255,255,255,0.05)'; this.style.color='#a1a1aa';">
+              <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+            </button>
           </div>
         </header>
 
@@ -383,6 +411,8 @@
                   <input id="ownerPasswordInput" class="iamax-input" type="password" placeholder="Solo si quieres iniciar como owner" />
                 </label>
               </section>
+
+
             </div>
 
             <footer class="modal-actions">
@@ -396,12 +426,12 @@
           <section class="workspace-modal auth-card auth-modal">
             <header class="workspace-modal-header">
               <div>
-                <p class="eyebrow">Seguridad</p>
-                <h3 class="config-title">Authenticator</h3>
+                <p class="eyebrow">Seguridad · Owner</p>
+                <h3 class="config-title">Centro de códigos 2FA</h3>
               </div>
               <button class="modal-close" id="closeAuthButton" type="button" aria-label="Volver">Volver</button>
             </header>
-            <p class="workspace-modal-subtitle">Codigos de verificacion y credenciales listas para inyectar.</p>
+            <p class="workspace-modal-subtitle">Dos espacios separados: códigos de Authenticator y códigos recibidos por correo. Los nombres se definen desde el Panel de Dueño.</p>
             <div id="authList" class="auth-list"></div>
           </section>
         </section>
@@ -457,31 +487,46 @@
               <iframe id="botIframe" src="about:blank" title="Bot WhatsApp"></iframe>
             </div>
           </section>
-        </section>
-
-        <template id="cardTemplate">
-          <article class="iamax-card">
+            <template id="cardTemplate">
+          <article class="iamax-card kaizen-style">
             <div class="iamax-wallpaper" aria-hidden="true"></div>
-            <button class="iamax-btn danger clear-local-btn clear-cache-floating hidden" type="button" title="Limpiar cookies y sesion local">Limpiar perfil</button>
-            <div class="iamax-overlay">
-              <div class="iamax-head">
-                <div class="iamax-title-block">
-                  <p class="iamax-category tool-category"></p>
-                  <h3 class="iamax-name tool-name"></h3>
-                </div>
-                <div class="live-badge-pc" data-card-id="" aria-label="Usuarios activos"></div>
-              </div>
-              <div class="iamax-footer">
-                <p class="iamax-desc tool-notes"></p>
-                <button class="iamax-btn options-btn" type="button">Opciones</button>
-                <div class="iamax-actions hidden">
-                  <button class="iamax-btn primary inject-card-btn" title="Inyectar credenciales automaticamente" type="button">Inyectar</button>
-                  <button class="iamax-btn tutorial-btn hidden" type="button" title="Ver tutorial de esta herramienta">Tutorial</button>
-                  <button class="iamax-btn fav-btn" title="Favorito" type="button">Favorito</button>
+            
+            <div style="position: absolute; top: 12px; left: 12px; display: flex; gap: 8px; z-index: 10;">
+              <div class="live-badge-pc" data-card-id="" aria-label="Usuarios activos"></div>
+              <div class="session-status-badge hidden" data-card-id="" style="z-index: 3; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(2px);"></div>
+            </div>
 
-                  <button class="iamax-btn warning report-btn" type="button">Reportar</button>
-                  <button class="iamax-btn primary upload-session-btn hidden" type="button">Guardar sesión</button>
-                </div>
+            <div class="owner-card-actions" aria-label="Acciones del dueño">
+              <button class="iamax-btn danger clear-local-btn hidden" type="button">
+                Limpiar perfil
+              </button>
+              <button class="iamax-btn primary upload-session-btn hidden" type="button">
+                Guardar sesión
+              </button>
+            </div>
+
+            <div class="subscription-lock-overlay hidden" aria-hidden="true">
+              <span class="subscription-lock-kicker">SUSCRIPCIÓN REQUERIDA</span>
+              <strong class="subscription-lock-plan">PLAN ESTÁNDAR</strong>
+              <small>Haz clic para adquirir acceso</small>
+            </div>
+            
+            <button class="iamax-btn danger report-btn" type="button" title="Reportar">Reportar</button>
+            
+            <div class="kaizen-bottom-bar" style="background-color: var(--card-accent, #ff7300);">
+               <span class="tool-name"></span>
+            </div>
+
+            <!-- Ocultamos los botones y elementos viejos para no romper dashboard.js -->
+            <div style="display: none;">
+              <p class="iamax-category tool-category"></p>
+              <p class="iamax-desc tool-notes"></p>
+              <button class="iamax-btn options-btn" type="button"></button>
+              <div class="iamax-actions">
+                <button class="iamax-btn primary inject-card-btn" type="button"></button>
+                <button class="iamax-btn tutorial-btn" type="button"></button>
+                <button class="iamax-btn fav-btn" type="button"></button>
+                <span class="session-cloud-badge" data-card-id=""></span>
               </div>
             </div>
           </article>
@@ -489,7 +534,10 @@
       </main>
     </div>
 
-    <script type="module" src="./dashboard.js"></script>
+    <script>
+      if (!window.chrome) window.chrome = {};
+      Object.assign(window.chrome, window.iamaxChrome || {});
+    </script>
+    <script type="module" src="./dashboard.js" onerror="alert('CRITICAL ERROR: No se pudo cargar dashboard.js. Puede ser un problema de rutas o de Electron.')"></script>
   </body>
 </html>
-

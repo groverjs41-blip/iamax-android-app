@@ -80,7 +80,7 @@
     getManifest: function() {
       return {
         name: "IAmax Launcher",
-        version: "1.3.8",
+        version: "1.3.9",
         manifest_version: 3,
         description: "Dashboard visual de herramientas IA con admin seguro en backend."
       };

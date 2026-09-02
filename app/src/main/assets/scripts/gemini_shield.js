@@ -42,7 +42,7 @@ const injectGeminiTools = () => {
         btn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            chrome.runtime.sendMessage({ type: "OPEN_TOOL_WINDOW", url: url });
+            chrome.runtime.sendMessage({ type: "OPEN_TOOL_WINDOW", url: url, useParentSession: true });
         };
 
         return btn;
@@ -69,6 +69,6 @@ const observer = new MutationObserver(() => {
         injectGeminiTools();
     }
 });
-observer.observe(document.documentElement, { childList: true, subtree: true });
+observer.observe((document.documentElement || document), { childList: true, subtree: true });
 
 })();

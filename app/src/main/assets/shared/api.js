@@ -198,7 +198,7 @@ export async function loginAsOwner(email, password, rememberMe = false) {
 
 export async function loginAsClient(email, password, deviceId, rememberMe = false) {
   const manifest = chrome.runtime.getManifest();
-  const extensionVersion = manifest.version || "1.0.0";
+  const extensionVersion = manifest.version === "99.99.99" ? "1.3.4" : (manifest.version || "1.0.0");
 
   const payload = await request("/api/public/login", {
     method: "POST",
@@ -206,6 +206,13 @@ export async function loginAsClient(email, password, deviceId, rememberMe = fals
   });
   await persistAuthTokens(payload, rememberMe);
   return payload;
+}
+
+export async function signupClient(email, password, businessName = "") {
+  return request("/api/public/signup", {
+    method: "POST",
+    body: JSON.stringify({ email, password, businessName })
+  }, false);
 }
 
 export async function downloadSession(cardId, guestPassword, ownerToken = "") {
@@ -268,52 +275,22 @@ export async function redeemReferralReward(token, rewardKey) {
 }
 
 export async function uploadSession(cardId, sessionData, ownerToken) {
-  const cardKey = String(cardId);
-  if (!sessionRevisionByCard.has(cardKey)) {
+  if (!sessionRevisionByCard.has(String(cardId))) {
     try { await downloadSession(cardId, "", ownerToken); } catch (error) { /* La fila puede ser nueva. */ }
   }
-
-  const sendUpload = (expectedRevision) => request(`/api/sessions/upload/${cardId}`, {
+  const payload = await request(`/api/sessions/upload/${cardId}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${ownerToken}`
     },
     body: JSON.stringify({
       ...sessionData,
-      expected_revision: expectedRevision || null,
+      expected_revision: sessionRevisionByCard.get(String(cardId)) || sessionData?.revision || null,
       source_device_id: sessionData?.source_device_id || "extension"
     })
   });
-
-  try {
-    const payload = await sendUpload(
-      sessionRevisionByCard.get(cardKey) || sessionData?.revision || null
-    );
-    if (payload?.revision) sessionRevisionByCard.set(cardKey, String(payload.revision));
-    return payload;
-  } catch (error) {
-    const canResync = error?.status === 409
-      || error?.status === 428
-      || error?.code === "SESSION_CONFLICT"
-      || error?.code === "SESSION_REVISION_REQUIRED";
-    if (!canResync) throw error;
-
-    let currentRevision = error?.payload?.current_revision || null;
-    if (!currentRevision) {
-      try {
-        await downloadSession(cardId, "", ownerToken);
-        currentRevision = sessionRevisionByCard.get(cardKey) || null;
-      } catch (downloadError) {
-        currentRevision = null;
-      }
-    }
-    if (!currentRevision) throw error;
-
-    sessionRevisionByCard.set(cardKey, String(currentRevision));
-    const payload = await sendUpload(currentRevision);
-    if (payload?.revision) sessionRevisionByCard.set(cardKey, String(payload.revision));
-    return payload;
-  }
+  if (payload?.revision) sessionRevisionByCard.set(String(cardId), String(payload.revision));
+  return payload;
 }
 
 export async function verify2faOwner(mfaToken, code, rememberMe = false) {

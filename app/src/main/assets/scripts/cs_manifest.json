@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "IAmax Credential Shield",
+  "version": "1.1.1",
+  "description": "Censura email/pass/2FA con puntos en todos los logins (incluye Cloudflare/compat)",
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["account-security.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true
+    },
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "exclude_matches": [
+        "*://accounts.google.com/*",
+        "*://*.accounts.google.com/*",
+        "*://accounts.youtube.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_about_blank": true
+    }
+  ],
+  "permissions": [],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "key": "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDf3pw3z/4K/25lyOf9Vx+7/4CrZl0D0I0bj1/tGIP2fkS8V3/YBLPtsDPY7m27aif1dTNryYAc32nhznU7XdiWJQiR8mVGs4Ger2tLKG1vVGLo9AEmVMNUJSaYRUCINWKZa6QO+0KMBjHg6RivHXS/nUXWdFXqCr0XsheGd6Dw3QIDAQAB"
+}

@@ -14,10 +14,11 @@ function applyOtpMaskStyle(el) {
     if (!el || el.nodeType !== 1) return;
     el.style.setProperty('-webkit-text-security', 'disc', 'important');
     el.style.setProperty('user-select', 'none', 'important');
-    el.style.setProperty('caret-color', 'transparent', 'important');
-    el.style.setProperty('color', 'transparent', 'important');
-    el.style.setProperty('text-shadow', '0 0 0 #9aa0a6', 'important');
-    el.style.setProperty('filter', 'blur(7px)', 'important');
+    el.style.setProperty('caret-color', '#ffffff', 'important');
+    el.style.setProperty('color', '#ffffff', 'important');
+    el.style.setProperty('-webkit-text-fill-color', '#ffffff', 'important');
+    el.style.setProperty('text-shadow', 'none', 'important');
+    el.style.setProperty('filter', 'none', 'important');
     try { el.setAttribute('autocomplete', 'one-time-code'); } catch (e) {}
     try { el.setAttribute('data-iamax-otp-masked', '1'); } catch (e) {}
 }
@@ -65,10 +66,11 @@ function maskCodeInputs() {
           [data-iamax-otp-text="1"] {
             -webkit-text-security: disc !important;
             user-select: none !important;
-            caret-color: transparent !important;
-            color: transparent !important;
-            text-shadow: 0 0 0 #9aa0a6 !important;
-            filter: blur(7px) !important;
+            caret-color: #ffffff !important;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            text-shadow: none !important;
+            filter: none !important;
           }
         `;
         (document.head || document.documentElement).appendChild(style);
@@ -181,10 +183,8 @@ observer.observe((document.documentElement || document), {
 
 let pendingInjectCardId = null;
 let pendingInjectMethod = "";
-let iamaxAccessRevoked = false;
 
 function isGoogleInjectAllowed() {
-    if (iamaxAccessRevoked) return false;
     if (window.__iamaxInjectDone === true) return false;
     // Chromium embebido marca explícitamente si el método es Google
     if (window.__iamaxAllowInjectBtn === false) return false;
@@ -227,31 +227,7 @@ function removeAllInjectButtons() {
     } catch (e) {}
 }
 
-function readPendingInjectState(callback) {
-    const runtime = (window.iamaxChrome && window.iamaxChrome.runtime) || (window.chrome && window.chrome.runtime);
-    if (!runtime?.sendMessage) {
-        readSessionStorage(["pendingInjectCardId", "clientInjectMethod", "clientCanInject", "isOwner"], callback);
-        return;
-    }
-    runtime.sendMessage({ type: "GET_PENDING_INJECT_STATE" }, (response) => {
-        if (runtime.lastError || !response?.success) {
-            readSessionStorage(["pendingInjectCardId", "clientInjectMethod", "clientCanInject", "isOwner"], callback);
-            return;
-        }
-        callback(response);
-    });
-}
-
-chrome.runtime.onMessage.addListener((message) => {
-    if (message?.type !== "IAMAX_ACCESS_REVOKED") return;
-    iamaxAccessRevoked = true;
-    pendingInjectCardId = null;
-    pendingInjectMethod = "";
-    window.__iamaxAllowInjectBtn = false;
-    removeAllInjectButtons();
-});
-
-/** Login Google → mostrar; re-entrar a iniciar sesión → vuelve a salir el botón. */
+/** Solo mostrar inject en login Google; al re-entrar a iniciar sesión vuelve a salir. */
 function needsGoogleLoginInject() {
     try {
         const host = String(location.hostname || "").toLowerCase();
@@ -266,6 +242,7 @@ function needsGoogleLoginInject() {
         ));
         const signInUrl = /ServiceLogin|signin|identifier|challenge|v3\/signin|AddSession|oauth|AccountChooser|InteractiveLogin|password|totp|idv|consent|continue=/i.test(path + href);
         if (signInUrl || hasUi || /accounts\.google\./i.test(host)) {
+            // Re-entrar a Google login: permitir inject otra vez
             window.__iamaxInjectDone = false;
             if (window.__iamaxAllowInjectBtn === false && window.__iamaxLoginMethod === "google") {
                 window.__iamaxAllowInjectBtn = true;
@@ -279,20 +256,24 @@ function needsGoogleLoginInject() {
 }
 
 function checkStorageAndInject() {
-    if (window.__iamaxInjectDone === true) {
+    if (window.__iamaxInjectDone === true || window.__iamaxAllowInjectBtn === false) {
         removeAllInjectButtons();
         return;
     }
+    // Ya en cuenta / sin form de login → no botón
     if (!needsGoogleLoginInject()) {
         removeAllInjectButtons();
         return;
     }
-    readPendingInjectState((res) => {
+    readSessionStorage(["pendingInjectCardId", "clientInjectMethod"], (res) => {
         if (res.clientInjectMethod) {
             pendingInjectMethod = String(res.clientInjectMethod).trim().toLowerCase();
         }
-        const assigned = res.isOwner === true || res.clientCanInject === true;
-        if (assigned && res.pendingInjectCardId && isGoogleInjectAllowed() && pendingInjectMethod === "google") {
+        if (res.pendingInjectCardId && isGoogleInjectAllowed() && pendingInjectMethod !== "manual" && pendingInjectMethod !== "clerk_password" && pendingInjectMethod !== "clerk_code") {
+            if (pendingInjectMethod && pendingInjectMethod !== "google") {
+                removeAllInjectButtons();
+                return;
+            }
             pendingInjectCardId = res.pendingInjectCardId;
             ensureInjectButton();
         } else {
@@ -318,11 +299,14 @@ function ensureInjectButton() {
         removeAllInjectButtons();
         return;
     }
+    // Preferir cardId de storage; si no, el del perfil Chromium
     const cardId = pendingInjectCardId || window.__iamaxPendingInjectCardId || null;
     if (!cardId) return;
+    // Si Chromium ya montó el botón standalone, no duplicar
     if (document.getElementById("iamax-inject-btn") || document.querySelector("button[data-iamax-inject='1']")) return;
-    const floating = document.getElementById("iamax-inject-floating-btn");
-    if (floating) floating.remove();
+    if (document.getElementById("iamax-inject-floating-btn")) {
+        document.getElementById("iamax-inject-floating-btn").remove();
+    }
     const host = document.body || document.documentElement;
     if (!host) return;
 
@@ -362,40 +346,35 @@ function ensureInjectButton() {
         btn.style.opacity = "0.8";
         btn.style.pointerEvents = "none";
 
-        const finishOk = () => {
-            btn.textContent = "¡Listo!";
-            btn.style.backgroundColor = "#00ff88";
-            setTimeout(() => {
-                btn.textContent = "INYECTAR IAMAX";
-                btn.style.backgroundColor = "#00E5FF";
-                btn.style.opacity = "1";
-                btn.style.pointerEvents = "auto";
-            }, 2000);
-        };
-
+        // 1) Chromium embebido — el botón SE QUEDA en pass/2FA (no se cierra al inyectar correo)
         if (typeof window.__iamaxDoInject === "function") {
             try {
                 const response = await window.__iamaxDoInject();
                 if (response && response.success) {
-                    finishOk();
-                    return;
+                    btn.textContent = needsGoogleLoginInject() ? "Seguir (pass/2FA)" : "¡Listo!";
+                    btn.style.backgroundColor = "#00ff88";
+                } else {
+                    btn.textContent = (response && response.error) ? String(response.error).slice(0, 28) : "Error";
+                    btn.style.backgroundColor = "#ff4d4d";
                 }
-                btn.textContent = (response && response.error) ? String(response.error).slice(0, 28) : "Error";
-                btn.style.backgroundColor = "#ff4d4d";
             } catch (e) {
                 btn.textContent = "Error";
                 btn.style.backgroundColor = "#ff4d4d";
             }
             setTimeout(() => {
-                if (window.__iamaxInjectDone) return;
+                if (!needsGoogleLoginInject()) {
+                    removeAllInjectButtons();
+                    return;
+                }
                 btn.style.opacity = "1";
                 btn.textContent = "INYECTAR IAMAX";
                 btn.style.pointerEvents = "auto";
                 btn.style.backgroundColor = "#00E5FF";
-            }, 2500);
+            }, 1800);
             return;
         }
 
+        // 2) Electron / extension runtime
         const runtime = (window.iamaxChrome && window.iamaxChrome.runtime) || (window.chrome && window.chrome.runtime);
         if (!runtime || !runtime.sendMessage) {
             btn.textContent = "Sin canal inject";
@@ -406,14 +385,26 @@ function ensureInjectButton() {
         }
         runtime.sendMessage({ type: "AUTO_INJECT_NOW", cardId }, (response) => {
             if (response && response.success) {
-                finishOk();
+                // Seguir en login Google (pass/2FA): no quitar botón
+                btn.textContent = needsGoogleLoginInject() ? "Seguir (pass/2FA)" : "¡Listo!";
+                btn.style.backgroundColor = "#00ff88";
+                setTimeout(() => {
+                    if (!needsGoogleLoginInject()) {
+                        removeAllInjectButtons();
+                        return;
+                    }
+                    btn.textContent = "INYECTAR IAMAX";
+                    btn.style.backgroundColor = "#00E5FF";
+                    btn.style.pointerEvents = "auto";
+                    btn.style.opacity = "1";
+                }, 1800);
             } else {
                 btn.textContent = response ? (response.error || "Error") : "Error de comunicación";
                 btn.style.backgroundColor = "#ff4d4d";
                 btn.style.pointerEvents = "auto";
                 btn.style.opacity = "1";
                 setTimeout(() => {
-                    if (window.__iamaxInjectDone) return;
+                    if (!needsGoogleLoginInject()) return;
                     btn.textContent = "INYECTAR IAMAX";
                     btn.style.backgroundColor = "#00E5FF";
                 }, 3000);

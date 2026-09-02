@@ -1,18 +1,9 @@
-// Visible only for owner/support sessions. Clients do not see this technical button.
-(async function() {
-  if (window.self !== window.top) return;
-  if (!await globalThis.iamaxModules?.isEnabled?.("chatgpt-diagnostics")) return;
-
-  const ownerState = await globalThis.chrome?.storage?.local
-    ?.get(["ownerToken", "iamax_admin_token"])
-    .catch(() => ({}));
-
-  if (!ownerState?.ownerToken && !ownerState?.iamax_admin_token) {
-    return;
-  }
+// chatgpt_ip_check.js
+(function() {
+  if (window.self !== window.top) return; // Only run in top frame
 
   const btn = document.createElement("button");
-  btn.innerText = "Verificar IP Proxy";
+  btn.innerText = "🌐 Verificar IP Proxy";
   btn.style.position = "fixed";
   btn.style.bottom = "20px";
   btn.style.right = "20px";
@@ -36,49 +27,37 @@
   });
 
   btn.addEventListener("click", async () => {
-    btn.innerText = "Verificando...";
+    btn.innerText = "🔄 Verificando...";
     btn.style.opacity = "0.8";
     btn.disabled = true;
     try {
-      const res = await fetch("https://api.ipify.org?format=json", { cache: "no-store" });
+      // Usamos una API pública sencilla que devuelve la IP en JSON
+      const res = await fetch("https://api.ipify.org?format=json");
       const data = await res.json();
-      const payload = {
-        ip: data.ip || "",
-        checkedAt: Date.now(),
-        ok: Boolean(data.ip)
-      };
-
-      await globalThis.chrome?.storage?.local?.set({ iamaxLastProxyIpCheck: payload });
-      btn.innerText = "IP actual: " + (data.ip || "desconocida");
-      btn.style.backgroundColor = "#208a68";
+      
+      btn.innerText = "✅ IP Actual: " + data.ip;
+      btn.style.backgroundColor = "#208a68"; // Un verde un poco más oscuro
       btn.style.opacity = "1";
-
+      
       setTimeout(() => {
-        btn.innerText = "Verificar IP Proxy";
+        btn.innerText = "🌐 Verificar IP Proxy";
         btn.style.backgroundColor = "#10a37f";
         btn.disabled = false;
       }, 6000);
-    } catch (error) {
-      const payload = {
-        ip: "",
-        checkedAt: Date.now(),
-        ok: false,
-        error: error?.message || "Error de red/proxy"
-      };
-
-      await globalThis.chrome?.storage?.local?.set({ iamaxLastProxyIpCheck: payload });
-      btn.innerText = "Error de red/proxy";
-      btn.style.backgroundColor = "#dc3545";
+    } catch (err) {
+      btn.innerText = "❌ Error de Red / Proxy";
+      btn.style.backgroundColor = "#dc3545"; // Rojo
       btn.style.opacity = "1";
-
+      
       setTimeout(() => {
-        btn.innerText = "Verificar IP Proxy";
+        btn.innerText = "🌐 Verificar IP Proxy";
         btn.style.backgroundColor = "#10a37f";
         btn.disabled = false;
       }, 5000);
     }
   });
 
+  // Esperar a que el body exista
   const interval = setInterval(() => {
     if (document.body) {
       document.body.appendChild(btn);

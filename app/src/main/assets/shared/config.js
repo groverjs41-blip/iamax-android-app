@@ -6,6 +6,8 @@ export const REFRESH_TOKEN_KEY = "refreshToken";
 export const BOT_EMAIL_KEY = "botEmail";
 export const BOT_PASSWORD_KEY = "botPassword";
 export const REMEMBER_SESSION_KEY = "iamax_remember_session";
+export const LOGIN_EMAIL_KEY = "iamaxLoginEmail";
+export const REMEMBER_LOGIN_EMAIL_KEY = "iamax_remember_login_email";
 
 const AUTH_PERSIST_KEYS = new Set([
   OWNER_TOKEN_KEY,
@@ -153,6 +155,28 @@ export async function clearLocalAuthSession() {
   }
 }
 
+/**
+ * Preferencia no sensible del formulario IAmax. Se guarda separada de tokens
+ * y contraseñas para poder recordar solo el correo sin reabrir la sesión.
+ */
+export async function getRememberedLoginEmail() {
+  try {
+    const data = await chrome.storage.local.get(LOGIN_EMAIL_KEY);
+    return String(data?.[LOGIN_EMAIL_KEY] || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+export async function setRememberedLoginEmail(email) {
+  const value = String(email || "").trim();
+  if (value) {
+    await chrome.storage.local.set({ [LOGIN_EMAIL_KEY]: value });
+  } else {
+    await chrome.storage.local.remove(LOGIN_EMAIL_KEY);
+  }
+}
+
 export async function getBotEmail() {
   return readSessionSecret(BOT_EMAIL_KEY);
 }
@@ -168,4 +192,3 @@ export async function getBotPassword() {
 export async function setBotPassword(password, persist = null) {
   await writeSessionSecret(BOT_PASSWORD_KEY, password || "", persist);
 }
-

@@ -1,0 +1,1556 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>IAmax Owner Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./app.css" />
+  
+</head>
+  <body class="owner-dashboard">
+    <div class="top-banner owner-banner" style="display:flex; justify-content:space-between; padding:0 24px; position:relative;">
+      <button class="owner-back-button" onclick="window.location.href='index.html'" type="button">
+        <svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg> Volver al dashboard
+      </button>
+      <span style="position:absolute; left:50%; transform:translateX(-50%);">MODO ADMINISTRADOR: GESTIONA TU IAMAX</span>
+      <span style="width:100px;"></span>
+    </div>
+
+    <div class="app-layout owner-layout">
+      <aside class="sidebar owner-sidebar">
+        
+        <div class="sidebar-header owner-sidebar-header">
+          <div id="brandLogoContainer" style="display: flex; align-items: center; justify-content: center; width: 100%;">
+            <img id="brandLogo" src="./assets/logo.png" alt="IAmax" style="width: 130px; height: auto;" />
+            <div style="display:none;">
+              <h2 id="brandTitle" class="brand-title">IAmax</h2>
+              <span id="brandSubtitle" class="brand-subtitle">OWNER</span>
+            </div>
+          </div>
+        </div>
+
+        <button id="openAuthButton" class="nav-category auth-nav-button" type="button">
+          <svg style="width:18px;height:18px;margin-right:8px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          CENTRO DE CÓDIGOS
+        </button>
+
+        <nav class="sidebar-nav" id="sidebarNav" aria-label="Navegación principal">
+          <a href="#statsGrid" class="nav-category active">Estadísticas</a>
+          <a href="#settingsPanel" class="nav-category">Ajustes</a>
+          <a href="#categoryPanel" class="nav-category">Categorías</a>
+          <a href="#cardPanel" class="nav-category">Crear tarjeta</a>
+          <a href="#cardsPanel" class="nav-category">Lista de tarjetas</a>
+          <a href="#tutorialsPanel" class="nav-category">Tutoriales</a>
+            <a href="#proxiesPanel" class="nav-category">Proxies</a>
+          <a href="#extensionsPanel" class="nav-category">Extensiones</a>
+            <a href="#teamPanel" class="nav-category">Miembros</a>
+        </nav>
+
+        <div class="sidebar-footer">
+          <a href="/client/live-chat" class="kaizen-btn ghost sidebar-action">Ver preview</a>
+          <button id="logoutButton" class="kaizen-btn primary sidebar-action" type="button">Cerrar sesión</button>
+        </div>
+      </aside>
+
+      <main class="main-content owner-main">
+        <!-- STATS GRID -->
+        <section class="stats-grid owner-stats owner-view active" id="statsGrid"></section>
+
+
+
+        <!-- SETTINGS PANEL -->
+<section class="panel owner-section owner-view" id="settingsPanel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">Branding del dashboard</p>
+              <h2>Ajustes generales</h2>
+            </div>
+            <p class="muted">Define los textos, logos, fondo y claves de acceso para el panel del cliente.</p>
+          </div>
+
+          <form id="settingsForm" class="form-grid">
+            <div class="field full">
+              <label for="titleInput">Título</label>
+              <input id="titleInput" placeholder="Título del dashboard" class="kaizen-input" />
+            </div>
+            <div class="field full">
+              <label for="subtitleInput">Subtítulo</label>
+              <input id="subtitleInput" placeholder="Subtítulo" class="kaizen-input" />
+            </div>
+            <div class="field full">
+              <label for="heroTitleInput">Título hero</label>
+              <input id="heroTitleInput" placeholder="Hero title" class="kaizen-input" />
+            </div>
+            <div class="field full">
+              <label for="heroHeadlineInput">Headline hero</label>
+              <input id="heroHeadlineInput" placeholder="Hero headline" class="kaizen-input" />
+            </div>
+            <div class="field full">
+              <label for="heroTextInput">Texto hero</label>
+              <textarea id="heroTextInput" placeholder="Texto principal del hero" class="kaizen-input"></textarea>
+            </div>
+            <div class="field">
+              <label for="sidebarTitleInput">Título sidebar</label>
+              <input id="sidebarTitleInput" placeholder="Sidebar title" class="kaizen-input" />
+            </div>
+            <div class="field">
+              <label for="footerNoteInput">Nota footer</label>
+              <input id="footerNoteInput" placeholder="Footer note" class="kaizen-input" />
+            </div>
+
+            <div class="field full upload-field">
+              <label class="eyebrow" for="logoFileInput">Subir logo opcional</label>
+              <div class="file-control">
+                <input id="logoFileInput" type="file" accept="image/*" />
+                <button type="button" id="clearLogoBtn" class="kaizen-btn ghost">Borrar logo</button>
+              </div>
+              <img id="logoPreview" class="preview-img logo-preview" alt="Preview del logo" />
+            </div>
+
+            <div class="field full upload-field">
+              <label class="eyebrow" for="backgroundFileInput">Subir fondo opcional</label>
+              <div class="file-control">
+                <input id="backgroundFileInput" type="file" accept="image/*" />
+                <button type="button" id="clearBackgroundBtn" class="kaizen-btn ghost">Borrar fondo</button>
+              </div>
+              <img id="backgroundPreview" class="preview-img background-preview" alt="Preview del fondo" />
+            </div>
+
+            <div class="field">
+              <label for="guestPasswordInput">Seguridad: clave Plan Estándar</label>
+              <input id="guestPasswordInput" type="text" placeholder="Ej. estandar123" class="kaizen-input" />
+            </div>
+            <div class="field">
+              <label for="ultraPasswordInput">Seguridad: clave Plan Ultra</label>
+              <input id="ultraPasswordInput" type="text" placeholder="Ej. ultraVIP2026" class="kaizen-input" />
+            </div>
+            <div class="field full">
+              <label for="globalAnnouncementInput">Anuncio global</label>
+              <textarea id="globalAnnouncementInput" placeholder="Ej. ChatGPT en mantenimiento..." class="kaizen-input"></textarea>
+            </div>
+            <div class="field full">
+              <label class="kaizen-checkbox-label" for="profileGroupsEnabledInput">
+                <input id="profileGroupsEnabledInput" type="checkbox" />
+                Activar reglas de grupos de perfiles
+              </label>
+              <p class="muted" style="font-size:0.75rem;margin-top:4px;">Apagado por seguridad: todos los clientes siguen viendo lo mismo hasta que lo actives.</p>
+            </div>
+            
+            <div class="input-group full-width">
+              <label for="minExtensionVersionInput">Versión Mínima Permitida (Kill Switch) <span class="badge" style="background:var(--danger);color:white;font-size:0.6rem;padding:2px 6px;border-radius:4px;">Peligro</span></label>
+              <input id="minExtensionVersionInput" type="text" placeholder="Ej. 1.0.0" class="kaizen-input" />
+              <p class="muted" style="font-size:0.75rem;margin-top:4px;">Cualquier extensión con una versión inferior a esta será bloqueada de inmediato.</p>
+            </div>
+
+            <div class="field">
+              <label for="latestExtensionVersionInput">Última versión (Actualización)</label>
+              <input id="latestExtensionVersionInput" type="text" placeholder="Ej. 1.1.9" class="kaizen-input" />
+            </div>
+            
+            <div class="field">
+              <label for="latestExtensionUrlInput">URL de Descarga del ZIP</label>
+              <input id="latestExtensionUrlInput" type="url" placeholder="https://link-de-descarga..." class="kaizen-input" />
+            </div>
+
+            
+<div class="field full-width" style="margin-top:16px; padding: 16px; background: rgba(25, 199, 168, 0.1); border-radius: 8px; border: 1px solid rgba(25, 199, 168, 0.3);">
+  <h3 style="margin: 0 0 8px 0; font-size: 1rem; color: var(--accent);">Fábrica de extensiones</h3>
+  <p class="muted" style="font-size: 0.85rem; margin-bottom: 12px;">Descarga la extensión compilada lista para enviar, configurada con la "Versión mínima permitida" de arriba.</p>
+  <button type="button" id="buildExtensionBtn" class="kaizen-btn primary" style="background: var(--accent); color: #000; font-weight: bold; width: 100%;">Generar y Descargar .ZIP</button>
+</div>
+<div class="actions full-width" style="margin-top:16px;">
+              <button class="kaizen-btn primary" type="submit">Guardar ajustes</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- CATEGORY PANEL -->
+<section class="panel owner-section owner-view" id="categoryPanel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">Organización</p>
+              <h2>Categorías</h2>
+            </div>
+            <p class="muted">Agrupa las tarjetas y marca cada categoría con su propio color de acento.</p>
+          </div>
+
+          <form id="categoryForm" class="form-grid compact-form">
+            <div class="field full">
+              <label for="categoryNameInput">Nombre de categoría</label>
+              <input id="categoryNameInput" placeholder="Nombre categoría" required class="kaizen-input" />
+            </div>
+            <div class="field">
+              <label for="categorySlugInput">Slug</label>
+              <input id="categorySlugInput" placeholder="Se genera si lo dejas vacío" class="kaizen-input" />
+            </div>
+            <div class="field">
+              <label for="categoryAccentInput">Color acento</label>
+              <input id="categoryAccentInput" placeholder="#0f5df5" class="kaizen-input" />
+            </div>
+            <div class="field">
+              <label for="categoryOrderInput">Orden</label>
+              <input id="categoryOrderInput" type="number" placeholder="0" value="0" class="kaizen-input" />
+            </div>
+            <div class="form-actions">
+              <button class="kaizen-btn primary" type="submit">Agregar categoría</button>
+            </div>
+          </form>
+
+          <div id="categoryList" class="category-list"></div>
+        </section>
+
+        <!-- CLIENTS PANEL -->
+
+
+        <!-- CARD PANEL -->
+<section class="panel owner-section owner-view" id="cardPanel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">Catalogo</p>
+              <h2 id="cardFormTitle">Crear tarjeta</h2>
+            </div>
+            <p class="muted">Configura acceso, login automático, imágenes y comportamiento de cada herramienta.</p>
+          </div>
+
+          <form id="cardForm" class="form-stack profile-editor">
+    <div class="layout">
+      <!-- Sidebar izquierda -->
+      <aside class="sidebar profile-sidebar">
+        <nav class="profile-nav">
+          <a class="profile-nav-item active" data-section="profile-general">General</a>
+          <a class="profile-nav-item" data-section="profile-proxy">Proxy</a>
+          <a class="profile-nav-item" data-section="profile-huella">Huella digital</a>
+          <a class="profile-nav-item" data-section="profile-avanzado">Avanzado</a>
+        </nav>
+      </aside>
+
+      <!-- Contenido principal -->
+      <main class="content profile-content">
+        <!-- GENERAL -->
+        <section class="profile-panel active" id="profile-general">
+          <div class="panel-head">Información principal</div>
+          
+          <fieldset class="form-fieldset">
+            <div class="form-grid">
+              <div class="field full">
+                <label for="cardNameInput">Nombre</label>
+                <input id="cardNameInput" placeholder="Ej. ChatGPT, Curso SEO..." required class="kaizen-input" />
+                <small>Este será el nombre que verán los clientes en el Centro de códigos.</small>
+              </div>
+              <div class="field full">
+                <label for="urlInput">URL</label>
+                <input id="urlInput" placeholder="https://..." required class="kaizen-input" />
+              </div>
+              <div class="field full">
+                <label for="categorySelect">Categoría</label>
+                <select id="categorySelect" class="kaizen-input"></select>
+              </div>
+              <div class="field full">
+                <label for="notesInput">Descripción corta</label>
+                <textarea id="notesInput" placeholder="Notas o descripción corta" class="kaizen-input"></textarea>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset class="form-fieldset accent-fieldset">
+            <legend>Auto-login Bot IAmax</legend>
+            <div class="form-grid">
+              <div class="field full">
+                <label for="loginMethodSelect">Método</label>
+                <select id="loginMethodSelect" class="kaizen-input">
+                  <option value="google">Continuar con Google</option>
+                  <option value="clerk_password">Clerk - email y contraseña</option>
+                  <option value="clerk_code">Clerk - email y código IMAP</option>
+                  <option value="manual">Desactivar auto-login</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="loginEmailInput">Correo</label>
+                <input id="loginEmailInput" type="email" placeholder="Correo de la cuenta" class="kaizen-input" />
+              </div>
+              <div class="field">
+                <label for="loginPasswordInput">Contraseña</label>
+                <input id="loginPasswordInput" type="text" placeholder="Contraseña de la cuenta" class="kaizen-input" />
+              </div>
+              <div class="field full owner-code-sources">
+                <div class="owner-code-source owner-code-source-totp">
+                  <strong>Authenticator 2FA</strong>
+                  <small>Para códigos generados cada 30 segundos.</small>
+                  <label for="totpSecretInput">Clave secreta TOTP</label>
+                  <input id="totpSecretInput" type="text" placeholder="Clave Base32 de Authenticator" class="kaizen-input" autocomplete="off" />
+                </div>
+                <div class="owner-code-source owner-code-source-email">
+                  <strong>Códigos recibidos en Gmail</strong>
+                  <small>Usará el correo escrito arriba y mostrará solamente el código reciente.</small>
+                  <label for="imapPasswordInput">Contraseña de aplicación de Gmail</label>
+                  <input id="imapPasswordInput" type="password" placeholder="16 caracteres de Google" class="kaizen-input" autocomplete="new-password" />
+                  <small>Activa IMAP y usa una contraseña de aplicación; nunca escribas aquí tu contraseña normal de Gmail.</small>
+                </div>
+              </div>
+            </div>
+          </fieldset>
+          
+          <fieldset class="form-fieldset">
+            <legend>Diseño y branding</legend>
+            <div class="form-grid">
+              <div class="field full upload-field">
+                <label class="eyebrow" for="cardLogoFileInput">Logo de tarjeta opcional</label>
+                <div class="file-control">
+                  <input id="cardLogoFileInput" type="file" accept="image/*" />
+                  <button type="button" id="clearCardLogoBtn" class="kaizen-btn ghost">Borrar logo</button>
+                </div>
+                <img id="cardLogoPreview" class="preview-img logo-preview" alt="Preview del logo de tarjeta" />
+              </div>
+              <div class="field full upload-field">
+                <label class="eyebrow" for="bannerFileInput">Banner o portada opcional</label>
+                <div class="file-control">
+                  <input id="bannerFileInput" type="file" accept="image/*" />
+                  <button type="button" id="clearBannerBtn" class="kaizen-btn ghost">Borrar banner</button>
+                </div>
+                <img id="bannerPreview" class="preview-img background-preview" alt="Preview del banner" />
+              </div>
+              <div class="field">
+                <label for="providerLabelInput">Marca</label>
+                <input id="providerLabelInput" placeholder="Ej. OpenAI" class="kaizen-input" />
+              </div>
+              <div class="field">
+                <label for="providerKeyInput">Identificador</label>
+                <input id="providerKeyInput" placeholder="Opcional" class="kaizen-input" />
+              </div>
+              <div class="field">
+                <label for="badgeInput">Badge</label>
+                <input id="badgeInput" placeholder="Ej. IA, DEV" class="kaizen-input" />
+              </div>
+              <div class="field">
+                <label for="sortOrderInput">Orden</label>
+                <input id="sortOrderInput" type="number" value="0" class="kaizen-input" />
+              </div>
+              <div class="field">
+                <label for="accentInput">Acento Primario</label>
+                <input id="accentInput" type="color" value="#19c7a8" class="kaizen-input" style="height: 40px; padding: 4px;" />
+              </div>
+              <div class="field">
+                <label for="secondaryAccentInput">Acento Secundario</label>
+                <input id="secondaryAccentInput" type="color" value="#0f5df5" class="kaizen-input" style="height: 40px; padding: 4px;" />
+              </div>
+              <div class="field full">
+                <label for="ctaInput">Texto del botón (Opcional)</label>
+                <input id="ctaInput" placeholder="Ej: Abrir herramienta" class="kaizen-input" />
+              </div>
+            </div>
+          </fieldset>
+        </section>
+
+        <!-- PROXY -->
+        <section class="profile-panel" id="profile-proxy">
+          <div class="panel-head">Proxy</div>
+          <div class="row">
+            <label>Configuración de proxy</label>
+            <div class="seg-group proxy-type-group" data-name="proxy">
+              <button type="button" class="seg active" data-type="none">Sin Proxy</button>
+              <button type="button" class="seg" data-type="saved">Guardado</button>
+              <button type="button" class="seg" data-type="custom">Personalizado</button>
+            </div>
+            <button type="button" id="testProxyBtn" class="kaizen-btn ghost" style="margin-left:auto;" title="Comprueba si el proxy responde y muestra la IP de salida">🌐 Testear IP del proxy</button>
+          </div>
+
+          <fieldset class="form-fieldset" id="savedProxyFields" style="display:none;">
+            <div class="field full">
+              <label>Seleccionar proxy guardado</label>
+              <select id="savedProxySelect" class="kaizen-input">
+                <option value="">No hay proxies guardados</option>
+              </select>
+            </div>
+          </fieldset>
+
+          <fieldset class="form-fieldset" id="proxyFields" style="display:none;">
+            <div class="form-grid">
+              <div class="field">
+                <label for="proxyHostInput">IP / Host del Proxy</label>
+                <input id="proxyHostInput" placeholder="Ej: 192.168.1.50" class="kaizen-input" />
+              </div>
+              <div class="field">
+                <label for="proxyPortInput">Puerto</label>
+                <input id="proxyPortInput" placeholder="Ej: 8080" class="kaizen-input" />
+              </div>
+              <div class="field">
+                <label for="proxyUsernameInput">Usuario</label>
+                <input id="proxyUsernameInput" placeholder="Opcional" class="kaizen-input" />
+              </div>
+              <div class="field">
+                <label for="proxyPasswordInput">Contraseña</label>
+                <input id="proxyPasswordInput" type="text" placeholder="Opcional" class="kaizen-input" />
+              </div>
+            </div>
+          </fieldset>
+        </section>
+
+        <!-- HUELLA DIGITAL -->
+        <section class="profile-panel" id="profile-huella">
+          <div class="panel-head">Huella digital</div>
+
+          <div class="row">
+            <label>Sistema operativo</label>
+            <select class="ua-select" id="osSelect" style="width: 100%;">
+              <option value="Windows">Windows</option>
+              <option value="macOS">macOS</option>
+              <option value="Android">Android</option>
+              <option value="iOS">iOS</option>
+              <option value="Linux">Linux</option>
+            </select>
+            <select class="ua-select" id="osSubVersionSelect" style="width: 100%; margin-top: 8px;">
+              <option value="all">Todas las versiones</option>
+            </select>
+          </div>
+
+          <!-- User Agent -->
+          <div class="row">
+            <label><span class="req">*</span> User Agent</label>
+            <div class="ua-row">
+              <select class="ua-select" id="uaVersion">
+                <option value="all">Todas las versiones</option>
+              </select>
+              <input class="ua-input" type="text" id="userAgentInput" value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.7417.3 Safari/537.36">
+              <button type="button" class="icon-btn" id="refreshUA" title="Actualizar user agent">Actualizar</button>
+            </div>
+          </div>
+
+          <!-- Idioma -->
+          <div class="row">
+            <label>Idioma</label>
+            <div class="seg-group" id="langGroup">
+              <button type="button" class="seg active" data-val="auto">Emparejar por IP</button>
+              <button type="button" class="seg" data-val="custom">Personalizado</button>
+            </div>
+          </div>
+          
+          <div class="row" id="langCustomRow" style="display:none;">
+            <label></label>
+            <select id="acceptLanguageInput" class="full-select">
+              <option value="es-ES,es;q=0.9">Español (España/Latam)</option>
+              <option value="en-US,en;q=0.9">Inglés (Estados Unidos)</option>
+              <option value="fr-FR,fr;q=0.9">Francés (Francia)</option>
+              <option value="pt-BR,pt;q=0.9">Portugués (Brasil)</option>
+              <option value="de-DE,de;q=0.9">Alemán (Alemania)</option>
+              <option value="it-IT,it;q=0.9">Italiano (Italia)</option>
+              <option value="zh-CN,zh;q=0.9">Chino (Simplificado)</option>
+            </select>
+          </div>
+
+          <div class="more-toggle" id="moreToggle">Más huellas</div>
+
+          <div class="more-section" id="moreSection">
+            <div class="row">
+              <label>Idioma de interfaz</label>
+              <div class="seg-group fp-group" data-key="interface_lang">
+                <button type="button" class="seg active" data-val="match">Emparejar por idioma</button>
+                <button type="button" class="seg" data-val="real">Real</button>
+                <button type="button" class="seg" data-val="custom">Personalizado</button>
+              </div>
+            </div>
+
+            <div class="row">
+              <label>Zona horaria</label>
+              <div class="seg-group fp-group" data-key="timezone">
+                <button type="button" class="seg active" data-val="ip">Emparejar por IP</button>
+                <button type="button" class="seg" data-val="custom">Personalizado</button>
+              </div>
+            </div>
+
+            <div class="row">
+              <label>Geolocalización</label>
+              <div class="seg-group fp-group" data-key="geolocation">
+                <button type="button" class="seg active" data-val="ask">Preguntar</button>
+                <button type="button" class="seg" data-val="allow">Permitir</button>
+                <button type="button" class="seg" data-val="block">Bloquear</button>
+              </div>
+            </div>
+
+            <div class="row">
+              <label>Resolución de pantalla</label>
+              <div class="seg-group fp-group" data-key="screen_resolution">
+                <button type="button" class="seg" data-val="custom">Personalizado</button>
+                <button type="button" class="seg active" data-val="real">Real</button>
+              </div>
+            </div>
+
+            <div class="row">
+              <label>Lista de fuentes</label>
+              <div class="seg-group fp-group" data-key="fonts_mode">
+                <button type="button" class="seg active" data-val="custom">Personalizado</button>
+                <button type="button" class="seg" data-val="real">Real</button>
+              </div>
+            </div>
+            <div class="fonts-box">
+              <p id="fontsPreviewText">Agency FB, Algerian, Andale Mono, Apple Braille 158 en total</p>
+              <div class="fonts-actions">
+                <span>Aleatorizar</span>
+                <span>Editar</span>
+                <span>Expandir</span>
+              </div>
+            </div>
+
+            <div class="row">
+              <label>WebRTC</label>
+              <div class="seg-group" id="webrtcGroup">
+                <button type="button" class="seg" data-val="default">Por defecto</button>
+                <button type="button" class="seg active" data-val="disable_non_proxied_udp">Desactivar</button>
+              </div>
+              <input type="hidden" id="webrtcModeSelect" value="disable_non_proxied_udp">
+            </div>
+
+            <!-- Bloques Ruido / Real -->
+            <div class="row"><label>Canvas</label>
+              <div class="seg-group fp-group" data-key="canvas"><button type="button" class="seg active" data-val="noise">Ruido</button><button type="button" class="seg" data-val="real">Real</button></div></div>
+            <div class="row"><label>ClientRects</label>
+              <div class="seg-group fp-group" data-key="clientrects"><button type="button" class="seg active" data-val="noise">Ruido</button><button type="button" class="seg" data-val="real">Real</button></div></div>
+            <div class="row"><label>AudioContext</label>
+              <div class="seg-group fp-group" data-key="audiocontext"><button type="button" class="seg active" data-val="noise">Ruido</button><button type="button" class="seg" data-val="real">Real</button></div></div>
+            <div class="row"><label>Imagen WebGL</label>
+              <div class="seg-group fp-group" data-key="webgl_image"><button type="button" class="seg active" data-val="noise">Ruido</button><button type="button" class="seg" data-val="real">Real</button></div></div>
+            <div class="row"><label>Dispositivos multimedia</label>
+              <div class="seg-group fp-group" data-key="media_devices"><button type="button" class="seg active" data-val="noise">Ruido</button><button type="button" class="seg" data-val="real">Real</button></div></div>
+
+            <div class="row">
+              <label>Metadatos WebGL</label>
+              <div class="seg-group fp-group" data-key="webgl_metadata">
+                <button type="button" class="seg active" data-val="custom">Personalizado</button>
+                <button type="button" class="seg" data-val="real">Real</button>
+              </div>
+            </div>
+            <div class="webgl-box">
+              <div class="sub-row">
+                <label>Proveedor WebGL</label>
+                <select class="full-select" id="webglVendorSel"></select>
+              </div>
+              <div class="sub-row">
+                <label>Render WebGL</label>
+                <input class="full-input" type="text" id="webglRendererInp">
+              </div>
+              <span class="rand-link" id="randWebglBtn">Aleatorizar</span>
+            </div>
+
+            <div class="row">
+              <label>WebGPU</label>
+              <div class="seg-group fp-group" data-key="webgpu">
+                <button type="button" class="seg active" data-val="webgl">Basado en WebGL</button>
+                <button type="button" class="seg" data-val="real">Real</button>
+                <button type="button" class="seg" data-val="disable">Desactivar</button>
+              </div>
+            </div>
+
+            <div class="row"><label>SpeechVoices</label>
+              <div class="seg-group fp-group" data-key="speech_voices"><button type="button" class="seg active" data-val="noise">Ruido</button><button type="button" class="seg" data-val="real">Real</button></div></div>
+
+            <div class="row">
+              <label>Concurrencia hardware</label>
+              <div class="inline">
+                <select class="small-select fp-input" data-key="hardware_concurrency"><option>2</option><option selected>6</option><option>8</option><option>12</option><option>16</option></select>
+                <span class="unit">Núcleos</span>
+              </div>
+            </div>
+
+            <div class="row">
+              <label>Memoria del dispositivo</label>
+              <div class="inline">
+                <select class="small-select fp-input" data-key="device_memory"><option>4</option><option selected>8</option><option>16</option><option>32</option></select>
+                <span class="unit">GB</span>
+              </div>
+            </div>
+
+            <div class="row"><label>Nombre del dispositivo</label>
+              <div class="seg-group fp-group" data-key="device_name"><button type="button" class="seg" data-val="custom">Personalizado</button><button type="button" class="seg active" data-val="real">Real</button></div></div>
+            <div class="row"><label>Dirección MAC</label>
+              <div class="seg-group fp-group" data-key="mac_address"><button type="button" class="seg" data-val="custom">Personalizado</button><button type="button" class="seg active" data-val="real">Real</button></div></div>
+            <div class="row"><label>No Rastrear</label>
+              <div class="seg-group fp-group" data-key="do_not_track"><button type="button" class="seg active" data-val="default">Por defecto</button><button type="button" class="seg" data-val="true">Activar</button><button type="button" class="seg" data-val="false">Cerrar</button></div></div>
+            <div class="row"><label>Batería</label>
+              <div class="seg-group fp-group" data-key="battery"><button type="button" class="seg active" data-val="noise">Ruido</button><button type="button" class="seg" data-val="real">Real</button></div></div>
+
+            <div class="row"><label>Protección PortScan</label>
+              <div class="seg-group fp-group" data-key="portscan"><button type="button" class="seg active" data-val="true">Activar</button><button type="button" class="seg" data-val="false">Cerrar</button></div></div>
+            <div class="row"><label></label>
+              <input class="full-input fp-input" data-key="portscan_ports" type="text" placeholder="Puertos permitidos (separar con comas)"></div>
+
+            <div class="row"><label>Aceleración hardware</label>
+              <div class="seg-group fp-group" data-key="hw_accel"><button type="button" class="seg active" data-val="default">Por defecto</button><button type="button" class="seg" data-val="true">Activar</button><button type="button" class="seg" data-val="false">Cerrar</button></div></div>
+
+            <div class="row"><label>Parámetros de inicio</label>
+              <input class="full-input fp-input" data-key="launch_args" type="text" placeholder="Opcional: formato -disabled-notifications, separar por comas"></div>
+
+            <p class="warn">Advertencia: cambiar kernel puede alterar la huella digital.</p>
+          </div>
+        </section>
+
+        <!-- AVANZADO -->
+        <section class="profile-panel" id="profile-avanzado">
+          <div class="panel-head">Opciones Básicas</div>
+
+          <!-- Opciones Nativas Avanzadas de IAmax -->
+          <fieldset class="form-fieldset" style="margin-bottom: 2rem;">
+            <div class="form-grid">
+              <div class="field full">
+                <label for="requiresSessionSelect">Tipo</label>
+                <select id="requiresSessionSelect" class="kaizen-input">
+                  <option value="true">Herramienta de IA: requiere inyectar sesión oculta</option>
+                  <option value="false">Enlace normal: curso, metodo o video</option>
+                </select>
+              </div>
+              <div class="field full">
+                <label for="blockedSelectorsInput">Escudo de Contenido (Selectores Bloqueados)</label>
+                <input id="blockedSelectorsInput" type="text" placeholder="Ej: .profile-icon, #settings" class="kaizen-input" />
+                <small style="color: var(--muted); font-size: 0.7rem;">Separa por comas. Estos elementos serán invisibles e inclicables para el cliente.</small>
+              </div>
+              <div class="field">
+                <label for="accessLevelSelect">Acceso</label>
+                <select id="accessLevelSelect" class="kaizen-input">
+                  <option value="standard">Plan Estándar</option>
+                  <option value="ultra">Plan Ultra</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="cardProfileGroupsSelect">Grupos de perfiles</label>
+                <select id="cardProfileGroupsSelect" class="kaizen-input" multiple size="4"></select>
+                <small style="color: var(--muted); font-size: 0.7rem;">Sin grupos asignados = visible para todos.</small>
+              </div>
+              <div class="field">
+                <label for="openAsSelect">Abrir como</label>
+                <select id="openAsSelect" class="kaizen-input">
+                  <option value="popup">Ventana flotante</option>
+                  <option value="tab">Pantalla completa</option>
+                </select>
+              </div>
+              <div class="field full">
+                <label for="tutorialUrlInput">Enlace a Tutorial (Opcional)</label>
+                <input id="tutorialUrlInput" type="url" placeholder="Ej: https://youtube.com/..." class="kaizen-input" />
+              </div>
+              
+              <div class="toggle-row full">
+                <label class="kaizen-checkbox-label">
+                  <input id="enableIncognitoRestartInput" type="checkbox" disabled title="Obsoleto: cada herramienta usa Chromium aislado por perfil" /> Reinicio incógnito (obsoleto — no se usa)
+                </label>
+              </div>
+              <div class="toggle-row full">
+                <label class="kaizen-checkbox-label">
+                  <input id="clientCanInjectInput" type="checkbox" /> Permitir a clientes ver botón Inyectar/Limpiar
+                </label>
+              </div>
+              <div class="toggle-row full">
+                <label class="kaizen-checkbox-label">
+                  <input id="clearCacheButtonInput" type="checkbox" /> Mostrar botón flotante "Borrar cache"
+                </label>
+                <small style="color: var(--muted); font-size: 0.7rem;">Apagado por defecto. Actívalo solo en los perfiles donde quieras permitir limpieza local.</small>
+              </div>
+              <div class="toggle-row full" style="margin-top:16px;">
+                <label class="kaizen-checkbox-label">
+                  <input id="streamingDrmCleanInput" type="checkbox" /> Compatibilidad streaming (navegador del sistema)
+                </label>
+                <small style="color: var(--muted); font-size: 0.7rem;">
+                  <strong>Apagado por defecto. Solo esta tarjeta.</strong>
+                  <strong>ON:</strong> Chrome del sistema (si no, Edge/Brave…). Perfil de la tarjeta + IP/proxy
+                  + <strong>cookies de la base de datos</strong> (la sesión que guardaste en la nube) inyectadas al abrir.
+                  Clientes entran con cuenta. No usa Chromium de IAmax.
+                  <strong>OFF (IAs):</strong> Chromium IAmax + cookies servidor + vídeo — sin cambios.
+                </small>
+              </div>
+              <div class="toggle-row full" style="margin-top:16px;">
+                <label class="kaizen-checkbox-label">
+                  <input id="lovableCompatInput" type="checkbox" /> Compat. Lovable (Chromium + Incognito + Inject)
+                </label>
+                <small style="color: var(--muted); font-size: 0.7rem;">
+                  <strong>Solo esta tarjeta</strong> (no afecta otras IAs).
+                  <strong>Chromium IAmax</strong> en <strong>Incognito</strong> con Usagi + Inject
+                  y perfil limpio. Activa “Allow in Incognito” automáticamente.
+                </small>
+              </div>
+              <div class="toggle-row full" style="margin-top:16px;">
+                <label class="kaizen-checkbox-label">
+                  <input id="chromiumLiteInput" type="checkbox" /> Modo ligero Chromium (Mac antiguo / poca RAM)
+                </label>
+                <small style="color: var(--muted); font-size: 0.7rem;">
+                  <strong>Opcional.</strong> Para iMac Intel viejos (8 GB, Iris Pro) o si Chromium se cierra solo.
+                  Menos extensiones auxiliares, menos GPU y menos procesos. Usa solo si hace falta.
+                </small>
+              </div>
+              <div class="toggle-row full" style="margin-top:20px;">
+                <label class="kaizen-checkbox-label">
+                  <input id="featuredInput" type="checkbox" /> Destacar en Hero
+                </label>
+              </div>
+              <div class="toggle-row full">
+                <label class="kaizen-checkbox-label">
+                  <input id="activeInput" type="checkbox" checked /> Activo
+                </label>
+              </div>
+            </div>
+          </fieldset>
+
+          <!-- Opciones Avanzadas del Perfil Anti-Detect (Dicloak) -->
+          <div class="panel-head">Gestión de Datos del Perfil</div>
+          
+          <!-- Páginas de inicio -->
+          <div class="row align-top">
+            <label>Páginas de inicio predeterminadas <span class="help">?</span></label>
+            <textarea class="textarea fp-input" data-key="adv_start_pages" id="startPages"
+              placeholder="Ingresa las URLs (ej.: https://www.example.com). Para varias páginas, escribe una URL por línea."></textarea>
+          </div>
+
+          <!-- Restaurar última sesión -->
+          <div class="row">
+            <label>Restaurar última sesión <span class="help">?</span></label>
+            <div class="seg-group fp-group" data-key="adv_restore_session">
+              <button type="button" class="seg active" data-val="global">Configuración global</button>
+              <button type="button" class="seg" data-val="restore">Restaurar</button>
+              <button type="button" class="seg" data-val="no_restore">No restaurar</button>
+            </div>
+          </div>
+
+          <!-- Sincronización de datos -->
+          <div class="row">
+            <label>Sincronización de datos <span class="help">?</span></label>
+            <div class="seg-group fp-group" id="syncGroup" data-key="adv_sync_mode">
+              <button type="button" class="seg active" data-val="global">Configuración global</button>
+              <button type="button" class="seg" data-val="custom">Personalizado</button>
+            </div>
+          </div>
+
+          <!-- Caja sincronización (se muestra si "Personalizado") -->
+          <div class="sync-box" id="syncBox">
+            <p class="box-title">Seleccione datos para sincronizar entre dispositivos (a la nube)</p>
+            <div class="checks">
+              <label class="chk"><input type="checkbox" class="fp-check" data-key="adv_sync_cookie" checked> Cookie</label>
+              <label class="chk"><input type="checkbox" class="fp-check" data-key="adv_sync_password" checked> Cuenta/Contraseña</label>
+              <label class="chk"><input type="checkbox" class="fp-check" data-key="adv_sync_bookmark"> Marcador</label>
+              <label class="chk"><input type="checkbox" class="fp-check" data-key="adv_sync_localstorage" checked> Local Storage</label>
+              <label class="chk"><input type="checkbox" class="fp-check" data-key="adv_sync_indexeddb" checked> IndexedDB</label>
+              <label class="chk"><input type="checkbox" class="fp-check" data-key="adv_sync_extensions" checked> Datos de extensiones <span class="help">i</span></label>
+            </div>
+
+            <hr class="divider">
+
+            <div class="switch-row">
+              <label class="switch">
+                <input type="checkbox" id="protectSwitch" class="fp-check" data-key="adv_sync_protect" checked>
+                <span class="slider"></span>
+              </label>
+              <span class="switch-text">Evita que los miembros sobrescriban los datos en la nube, lo que podría causar el cierre de sesión de las cuentas en el perfil</span>
+            </div>
+
+            <div class="row">
+              <label><span class="req">*</span> Lista blanca <span class="help">?</span></label>
+              <div class="tag-select">
+                <span class="tag">Grupo Superad... <span class="tag-x">✕</span></span>
+                <span class="tag-arrow">▾</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Limpiar caché local -->
+          <div class="row">
+            <label>Limpiar caché local <span class="help">?</span></label>
+            <div class="seg-group fp-group" data-key="adv_clear_cache">
+              <button type="button" class="seg active" data-val="global">Configuración global</button>
+              <button type="button" class="seg" data-val="custom">Personalizado</button>
+            </div>
+          </div>
+
+          <!-- Configuración del navegador -->
+          <div class="row">
+            <label>Configuración del navegador <span class="help">?</span></label>
+            <div class="seg-group fp-group" data-key="adv_browser_settings">
+              <button type="button" class="seg active" data-val="global">Configuración global</button>
+              <button type="button" class="seg" data-val="custom">Personalizado</button>
+            </div>
+          </div>
+
+          <!-- Modo multi-apertura -->
+          <div class="row">
+            <label>Modo multi-apertura <span class="help">?</span></label>
+            <div class="seg-group fp-group" data-key="adv_multi_open">
+              <button type="button" class="seg" data-val="global">Configuración global</button>
+              <button type="button" class="seg active" data-val="allow">Permitir</button>
+              <button type="button" class="seg" data-val="disable">Desactivar</button>
+            </div>
+          </div>
+
+          <!-- Inspector Remoto -->
+          <div class="row">
+            <label>Inspector Remoto <span class="help">?</span></label>
+            <div class="seg-group fp-group" data-key="adv_remote_inspector">
+              <button type="button" class="seg active" data-val="global">Configuración global</button>
+              <button type="button" class="seg" data-val="allow">Permitir</button>
+              <button type="button" class="seg" data-val="disable">Desactivar</button>
+            </div>
+          </div>
+
+          <!-- Configuración marcadores -->
+          <div class="row">
+            <label>Configuración marcadores <span class="help">?</span></label>
+            <div class="seg-group fp-group" data-key="adv_bookmarks">
+              <button type="button" class="seg active" data-val="global">Configuración global</button>
+              <button type="button" class="seg" data-val="custom">Personalizado</button>
+            </div>
+          </div>
+
+          <!-- Restricción acceso web -->
+          <div class="row">
+            <label>Restricción acceso web <span class="help">?</span></label>
+            <div class="seg-group fp-group" data-key="adv_web_restriction">
+              <button type="button" class="seg active" data-val="global">Configuración global</button>
+              <button type="button" class="seg" data-val="custom">Personalizado</button>
+            </div>
+          </div>
+
+          <!-- Configuración extensión -->
+          <div class="row">
+            <label>Configuración extensión <span class="help">?</span></label>
+            <div class="seg-group fp-group" id="extGroup" data-key="adv_extensions">
+              <button type="button" class="seg active" data-val="enable">Activar</button>
+              <button type="button" class="seg" data-val="disable">Cerrar</button>
+            </div>
+          </div>
+
+          <!-- Caja extensión -->
+          <div class="ext-box" id="extBox">
+            <div class="sub-row">
+              <label>Grupo extensión</label>
+              <select class="full-select fp-input" data-key="adv_extension_group" id="extSelect">
+                <option value="iamax">IAMAX (2 extensiones)</option>
+                <option value="marketing">Grupo Marketing (5 extensiones)</option>
+                <option value="none">Sin grupo</option>
+              </select>
+            </div>
+            <p class="ext-note">Las extensiones activas del grupo se añadirán al perfil actual. Para más, vea [Configuración]</p>
+          </div>
+
+          <!-- Reemplazo de video -->
+          <div class="row">
+            <label>Reemplazo de video <span class="help">?</span></label>
+            <div class="seg-group fp-group" data-key="adv_video_replacement">
+              <button type="button" class="seg" data-val="enable">Activar</button>
+              <button type="button" class="seg active" data-val="disable">Desactivar</button>
+            </div>
+          </div>
+
+        </section>
+
+      </main>
+
+      <!-- Panel resumen derecha -->
+      <aside class="summary profile-summary">
+        <div class="summary-head">
+          <span>Resumen perfil</span>
+          <span class="upd" id="updateFpSummary">Actualizar</span>
+        </div>
+        <div class="summary-list" id="summaryList">
+        </div>
+      </aside>
+    </div>
+
+    <!-- Acciones Footer -->
+    <div class="profile-actions">
+      <button type="button" id="cancelEditButton" class="btn-cancel">Cancelar</button>
+      <button type="submit" id="saveCardButton" class="btn-confirm">Confirmar y Guardar</button>
+    </div>
+  </form>
+        </section>
+
+        <!-- CARDS PANEL -->
+<section class="panel owner-section owner-view" id="cardsPanel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">Inventario</p>
+              <h2>Tarjetas del dashboard</h2>
+            </div>
+            <p class="muted">Estas son las tarjetas que verá la extensión y el panel web del cliente.</p>
+          </div>
+          <div class="kaizen-grid owner-card-grid" id="toolGrid"></div>
+        </section>
+
+        <!-- TUTORIALS PANEL -->
+<section class="panel owner-section owner-view" id="tutorialsPanel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">Contenido Educativo</p>
+              <h2>Videotutoriales</h2>
+            </div>
+            <p class="muted">Añade enlaces de videos (como Google Drive, YouTube o MP4) para que tus clientes puedan verlos directamente en su Dashboard.</p>
+          </div>
+
+          <form id="tutorialForm" class="form-grid" style="margin-bottom: 32px;">
+            <div class="field full">
+              <label for="tutorialTitle">Título del video</label>
+              <input id="tutorialTitle" placeholder="Ej: Cómo usar Gemini correctamente" class="kaizen-input" required />
+            </div>
+            <div class="field full">
+              <label for="tutorialUrl">Enlace del video (URL pública o iframe)</label>
+              <input id="tutorialUrl" placeholder="Ej: https://drive.google.com/file/d/.../preview" class="kaizen-input" required />
+            </div>
+            <div class="field full">
+              <label for="tutorialDesc">Descripción (Opcional)</label>
+              <textarea id="tutorialDesc" placeholder="Breve explicación de lo que enseña el video" class="kaizen-input"></textarea>
+            </div>
+            <div class="field">
+              <label for="tutorialOrder">Orden (Prioridad)</label>
+              <input id="tutorialOrder" type="number" value="0" class="kaizen-input" />
+            </div>
+            <div class="field full" style="display:flex; justify-content:flex-end;">
+              <button class="primary-button" type="submit">Guardar Tutorial</button>
+            </div>
+          </form>
+
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Orden</th>
+                  <th>Título</th>
+                  <th>URL del video</th>
+                  <th style="width:100px;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tutorialsTableBody">
+                <!-- Tutoriales inyectados -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- PROXIES PANEL -->
+<section class="panel owner-section owner-view own-section" id="proxiesPanel">
+          <header class="own-section-head">
+            <div>
+              <p class="panel-kicker">Acceso y red</p>
+              <h2 class="own-section-title">Red de Proxies</h2>
+              <p class="own-section-sub">Administra proxies reutilizables para tarjetas y perfiles.</p>
+            </div>
+          </header>
+          <div class="dic-alert own-alert">Cada proxy guardado se puede elegir dentro de cualquier tarjeta/perfil IAmax.</div>
+          
+          <div class="dic-tabs">
+            <button class="dic-tab active" data-tab="lista">Lista de proxies</button>
+            <button class="dic-tab" data-tab="config">Configuración proxy</button>
+            <button class="dic-tab" data-tab="recursos">Recursos</button>
+          </div>
+
+          <!-- TAB Lista -->
+          <div class="dic-tab-content active" id="tab-lista">
+            <div class="dic-toolbar own-toolbar">
+              <button class="dic-btn-green" id="btnCrearProxy">+ Crear proxy</button>
+              <button class="dic-btn-dark">Crear en lote ▾</button>
+              <div class="dic-toolbar-right">
+                <input class="dic-search" placeholder="Dirección IP">
+                <input class="dic-search" placeholder="Observación">
+                <select class="dic-select"><option>Tipo proxy</option><option>SOCKS5</option><option>HTTP</option></select>
+              </div>
+            </div>
+
+            <div class="own-table-shell">
+            <table class="dic-data-table own-data-table">
+              <thead>
+                <tr>
+                  <th><input type="checkbox" id="checkAllProxies"></th>
+                  <th>#</th><th>Información</th><th>Observación</th>
+                  <th>IP de salida</th><th>Perfiles</th>
+                  <th>Creado</th><th>Operación</th>
+                </tr>
+              </thead>
+              <tbody id="proxyTableBody"></tbody>
+            </table>
+            </div>
+
+            <div class="dic-pagination">
+              <span>Total <b id="proxyTotal">0</b></span>
+              <button class="dic-pg">‹</button>
+              <button class="dic-pg active">1</button>
+              <button class="dic-pg">›</button>
+              <select class="dic-select"><option>10/pág...</option></select>
+              <span>Ir a <input class="dic-goto" value="1"></span>
+            </div>
+          </div>
+
+          <!-- TAB Configuración -->
+          <div class="dic-tab-content" id="tab-config">
+            <div class="dic-config-layout">
+              <div class="dic-config-list">
+                <div class="dic-config-item active">IPFLY</div>
+                <div class="dic-config-item">NodeMaven</div>
+                <div class="dic-config-item">922S5</div>
+                <div class="dic-config-item">IPRoyal</div>
+                <div class="dic-config-item">Netnut</div>
+                <div class="dic-config-soon">Próximamente:</div>
+                <div class="dic-config-item dim">BrightData</div>
+                <div class="dic-config-item dim">Oxylabs</div>
+              </div>
+              <div class="dic-config-form">
+                <div class="dic-config-head">
+                  <h2>IPFLY</h2>
+                  <div>
+                    <button class="dic-link-btn">🔄 Restablecer</button>
+                    <button class="dic-link-btn">🔗 Visitar sitio IPFLY</button>
+                  </div>
+                </div>
+                <label class="dic-form-label">Host:Puerto</label>
+                <div class="dic-host-row">
+                  <select class="dic-select"><option>SOCKS5</option><option>HTTP</option></select>
+                  <input class="dic-input" value="py.ipflygates.com">
+                  <span class="dic-colon">:</span>
+                  <input class="dic-input port" value="16666">
+                </div>
+                <label class="dic-form-label">Cuenta proxy</label>
+                <input class="dic-input full" placeholder="Ingrese cuenta">
+                <label class="dic-form-label">Contraseña proxy</label>
+                <input class="dic-input full" type="password" placeholder="Ingrese contraseña">
+                <button class="dic-btn-green-outline" id="verifyProxy">Verificando proxy</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="dic-tab-content" id="tab-recursos">
+            <p style="padding:40px;color:#8b949e">Sección de Recursos…</p>
+          </div>
+        </section>
+
+        <!-- EXTENSIONS PANEL -->
+<section class="panel owner-section owner-view" id="extensionsPanel">
+          <div class="ext-ui-page-head">
+            <div>
+              <p class="panel-kicker">Perfiles y paquetes</p>
+              <h2 class="ext-ui-page-title">Extensiones</h2>
+              <p class="ext-ui-page-sub">Sube, agrupa y asigna extensiones a perfiles. Las rutas locales descomprimidas se cargan dentro del perfil.</p>
+            </div>
+          </div>
+
+          <div class="dic-alert ext-ui-alert">Sube un .zip/.crx o registra una extensión de Chrome Store. Organízalas por grupo y actívalas por perfil.</div>
+
+          <div class="dic-tabs">
+            <button class="dic-tab active" data-tab="añadida">Extensión añadida</button>
+            <button class="dic-tab" data-tab="marketplace">Marketplace</button>
+            <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+               <span class="ext-ui-security-pill">Protección de seguridad desactivada</span>
+            </div>
+          </div>
+
+          <div class="dic-tab-content active" id="ext-tab-añadida">
+            <div class="dic-toolbar ext-ui-toolbar">
+              <button class="dic-btn-green" id="btnCrearExtension">+ Extensión añadida</button>
+              <button class="dic-btn-green-outline" type="button">Configuración de grupo</button>
+              <div class="dic-toolbar-right">
+                <select class="dic-select"><option>Grupo</option></select>
+                <select class="dic-select"><option>Estado</option></select>
+                <input class="dic-search" placeholder="Nombre extensión">
+              </div>
+            </div>
+
+            <div id="extensionGrid" class="ext-ui-grid"></div>
+          </div>
+
+          <div class="dic-tab-content" id="ext-tab-marketplace">
+            <div class="ext-ui-empty" style="margin-top:8px;">
+              <div class="ext-ui-empty-icon" aria-hidden="true">🛒</div>
+              <strong>Marketplace local</strong>
+              <p>Sin catálogo remoto por ahora. Usa “+ Extensión añadida” para subir paquetes.</p>
+            </div>
+          </div>
+        </section>
+
+<!-- TEAM PANEL -->
+<section class="panel owner-section owner-view" id="teamPanel">
+          <div class="panel-header">
+            <h2>Miembros</h2>
+          </div>
+
+          <div class="dic-tabs">
+            <button class="dic-tab active" data-tab="clientes">Clientes</button>
+            <button class="dic-tab" data-tab="grupos">Grupos de perfiles</button>
+            <button class="dic-tab" data-tab="internos">Equipo interno</button>
+          </div>
+          
+          <div class="dic-tab-content active" id="tab-clientes">
+            <div class="client-workspace clients-ui">
+              <header class="clients-ui-header">
+                <div>
+                  <h2 class="clients-ui-title">Clientes</h2>
+                  <p class="clients-ui-subtitle">Gestioná el acceso de cada cliente:</p>
+                </div>
+                <button class="dic-btn-green client-create-btn clients-ui-create" id="btnAgregarClienteBtn" type="button">
+                  <span aria-hidden="true">+</span> Crear cliente
+                </button>
+              </header>
+
+              <div class="clients-ui-stats">
+                <div class="clients-ui-stat-card" aria-label="Total de clientes">
+                  <div class="clients-ui-stat-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="9" cy="7" r="4"></circle>
+                      <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                  </div>
+                  <div class="clients-ui-stat-meta">
+                    <strong id="totalClientsCounter">0</strong>
+                    <span>Total</span>
+                  </div>
+                </div>
+                <div class="clients-ui-stat-card is-ok" aria-label="Clientes vigentes">
+                  <div class="clients-ui-stat-meta">
+                    <strong id="activeClientsCounter">0</strong>
+                    <span>Vigentes</span>
+                  </div>
+                </div>
+                <div class="clients-ui-stat-card is-warn" aria-label="Clientes suspendidos o vencidos">
+                  <div class="clients-ui-stat-meta">
+                    <strong id="inactiveClientsCounter">0</strong>
+                    <span>Inactivos</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="clients-ui-search-row">
+                <label class="clients-ui-search">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="7"></circle>
+                    <path d="m20 20-3.5-3.5"></path>
+                  </svg>
+                  <span class="sr-only">Buscar clientes</span>
+                  <input id="clientSearchInput" type="search" placeholder="Buscar por nombre, correo o teléfono..." autocomplete="off">
+                </label>
+                <label class="clients-ui-filter">
+                  <span class="sr-only">Filtrar por grupo</span>
+                  <select class="dic-select" id="clientGroupFilter">
+                    <option value="all">Todos los grupos</option>
+                    <option value="none">Sin grupo</option>
+                  </select>
+                </label>
+                <label class="clients-ui-filter">
+                  <span class="sr-only">Filtrar por estado</span>
+                  <select class="dic-select" id="clientStatusFilter">
+                    <option value="all">Todos los estados</option>
+                    <option value="vigente">Vigentes</option>
+                    <option value="inactivo">Vencidos / Inactivos</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="clients-ui-list" id="clientsList" role="list">
+                <div class="clients-ui-empty" id="clientsEmptyState">Cargando clientes...</div>
+              </div>
+              <div id="clientsTableBody" hidden aria-hidden="true"></div>
+
+              <div class="client-pagination clients-ui-pagination">
+                <span id="clientsResultSummary">0 resultados</span>
+                <div class="client-page-controls">
+                  <button class="dic-pg" id="clientsPrevPage" type="button" aria-label="Página anterior">&#8249;</button>
+                  <span class="client-page-indicator" id="clientsPageIndicator">1 / 1</span>
+                  <button class="dic-pg" id="clientsNextPage" type="button" aria-label="Página siguiente">&#8250;</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dic-tab-content" id="tab-grupos">
+            <div class="dic-member-head">
+              <div>
+                <span class="dic-team">Grupos de perfiles</span><br>
+                <span class="dic-team-id">Organiza que perfiles puede ver cada cliente.</span>
+              </div>
+            </div>
+
+            <form id="profileGroupForm" class="form-grid compact-form">
+              <input type="hidden" id="profileGroupIdInput" value="" />
+              <div class="field">
+                <label for="profileGroupNameInput">Nombre del grupo</label>
+                <input id="profileGroupNameInput" class="kaizen-input" placeholder="Ej. IA Premium" required />
+              </div>
+              <div class="field">
+                <label for="profileGroupDescriptionInput">Descripcion</label>
+                <input id="profileGroupDescriptionInput" class="kaizen-input" placeholder="Opcional" />
+              </div>
+              <div class="form-actions">
+                <button class="kaizen-btn ghost hidden" id="cancelProfileGroupBtn" type="button">Cancelar</button>
+                <button class="kaizen-btn primary" id="saveProfileGroupBtn" type="submit">Guardar grupo</button>
+              </div>
+            </form>
+
+            <div class="table-container" style="margin-top: 24px;">
+              <table class="dic-data-table">
+                <thead>
+                  <tr>
+                    <th>Grupo</th>
+                    <th>Descripcion</th>
+                    <th>Clientes</th>
+                    <th>Perfiles</th>
+                    <th style="width:160px;">Operacion</th>
+                  </tr>
+                </thead>
+                <tbody id="profileGroupsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="dic-tab-content" id="tab-internos">
+          
+          <div class="dic-member-head">
+            <div>
+              <span class="dic-team">Equipo actual: IAmax Admin ✎</span><br>
+              <span class="dic-team-id">ID de equipo: b064P5eC</span>
+            </div>
+            <button class="dic-btn-green" id="btnCrearMiembro">+ Crear miembro</button>
+            <button class="dic-btn-dark" type="button" disabled title="Disponible cuando se conecte una API real">Crear API ▾</button>
+            <div class="dic-toolbar-right">
+              <select class="dic-select"><option>Grupo de miembros</option></select>
+              <input class="dic-search" placeholder="Nombre del miembro /ID">
+              <button class="dic-icon-btn">🔍</button>
+              <button class="dic-icon-btn">⛃</button>
+            </div>
+          </div>
+
+          <table class="dic-data-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox"></th>
+                <th>Nombre del miembro</th><th>Observación</th>
+                <th>Grupo de perfiles</th><th>Rol del miembro</th>
+                <th>Grupo de miembros</th><th>Estado</th>
+                <th>Último inicio</th><th>Operación</th>
+              </tr>
+            </thead>
+            <tbody id="memberTableBody"></tbody>
+          </table>
+
+          <div class="dic-pagination">
+            <span>Total <b id="memberTotal">0</b></span>
+            <button class="dic-pg">‹</button>
+            <button class="dic-pg active">1</button>
+            <button class="dic-pg">›</button>
+          </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <template id="categoryTemplate">
+      <article class="category-card">
+        <span class="category-accent"></span>
+        <h3 class="category-name"></h3>
+        <p class="meta"></p>
+        <button class="kaizen-btn danger category-delete" type="button">Borrar</button>
+      </article>
+    </template>
+
+    <template id="toolTemplate">
+      <article class="kaizen-card owner-tool-card">
+        <div class="kaizen-wallpaper tool-banner"></div>
+        <div class="kaizen-overlay">
+          <div class="kaizen-head">
+            <div class="kaizen-badge tool-badge"></div>
+            <div>
+              <p class="kaizen-category tool-category"></p>
+              <h3 class="kaizen-name tool-name"></h3>
+              <p class="meta tool-meta"></p>
+            </div>
+          </div>
+          <div class="kaizen-footer">
+            <p class="kaizen-desc tool-notes"></p>
+            <button class="kaizen-btn options-btn" type="button">Opciones</button>
+            <div class="kaizen-actions hidden">
+              <button class="kaizen-btn edit-button" type="button">Editar</button>
+              <button class="kaizen-btn duplicate-button" type="button">Copiar</button>
+              <button class="kaizen-btn ghost export-session" title="Exportar sesión" type="button">Exportar</button>
+                <button class="kaizen-btn ghost import-session" title="Importar sesión" type="button">Importar</button>
+                <button class="kaizen-btn danger delete-button" type="button">Borrar</button>
+            </div>
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <dialog id="authDialog" class="kaizen-modal config-dialog">
+      <div class="config-card auth-card owner-code-center">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+          <h3 class="config-title" style="margin:0; display:flex; align-items:center; gap:8px;">
+            <svg style="width:24px;height:24px;color:var(--accent-cyan);" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            Centro de códigos 2FA
+          </h3>
+          <button class="ghost-button" id="closeAuthButton" type="button" style="padding:4px 8px; min-height:0; margin:0;">Cerrar</button>
+        </div>
+        <p class="muted" style="margin-top:0;">Configura cada servicio y revisa los códigos que podrán ver tus clientes.</p>
+        <div class="owner-code-manager">
+          <div class="owner-code-manager-copy">
+            <strong>Configurar Gmail o Authenticator</strong>
+            <span>Elige ChatGPT u otra tarjeta. Su nombre será el que verá el cliente.</span>
+          </div>
+          <select id="authCardSelect" class="kaizen-input" aria-label="Tarjeta a configurar"></select>
+          <button id="configureAuthCardButton" class="kaizen-btn primary" type="button">Configurar fuente del código</button>
+        </div>
+        <div class="owner-code-help">
+          <strong>Gmail:</strong> escribe el correo receptor y una contraseña de aplicación de Google de 16 caracteres. El cliente solo verá el código de verificación, nunca tu contraseña ni el correo completo.
+        </div>
+        
+        <div id="authList" style="display:grid; gap:12px; max-height:60vh; overflow-y:auto; padding-right:4px;">
+          <!-- Códigos inyectados por JS -->
+        </div>
+      </div>
+    </dialog>
+
+
+    <script>
+      window.chrome = window.iamaxChrome;
+    </script>
+    <script type="module" src="./owner.js"></script>
+
+
+<div class="dic-modal-overlay" id="memberModal">
+    <div class="dic-modal">
+      <div class="dic-modal-head">
+        <h2 id="memberModalTitle">Añadir miembro interno</h2>
+        <span class="dic-modal-close" id="modalClose">✕</span>
+      </div>
+      <div class="dic-modal-body">
+        <div class="dic-mfield">
+          <label>Nombre del miembro</label>
+          <input class="dic-input full" id="memberName" placeholder="Opcional" maxlength="20">
+        </div>
+        <div class="dic-mfield">
+          <label><span class="dic-req">*</span> Usuario</label>
+          <input class="dic-input full" id="memberUser" placeholder="Ingrese usuario" maxlength="20">
+        </div>
+        <div class="dic-mfield">
+          <label><span class="dic-req">*</span> Contraseña</label>
+          <div class="dic-pwd-row">
+            <input class="dic-input" type="text" id="memberPwd" placeholder="Por favor, introduzca contraseña">
+            <button class="dic-icon-btn" id="genPwd">🔄</button>
+          </div>
+        </div>
+        <div class="dic-mfield">
+          <label><span class="dic-req">*</span> Grupo de perfiles</label>
+          <select class="dic-input full" id="memberProfileGroup"><option>Todos los grupos</option></select>
+        </div>
+        <div class="dic-mfield">
+          <label><span class="dic-req">*</span> Rol del miembro</label>
+          <div class="dic-radios">
+            <label><input type="radio" name="rol" value="Admin"> Admin</label>
+            <label><input type="radio" name="rol" value="Gerente"> Gerente</label>
+            <label><input type="radio" name="rol" value="Personal" checked> Personal</label>
+          </div>
+        </div>
+      </div>
+      <div class="dic-modal-footer">
+        <button class="dic-btn-dark" id="modalCancel">Cancelar</button>
+        <button class="dic-btn-green" id="modalConfirm">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+<!-- Resultado test proxy — modal oscuro IAmax (nunca alert blanco del SO) -->
+<div class="proxy-result-overlay" id="proxyTestResultModal" aria-hidden="true">
+  <div class="proxy-result-card" role="dialog" aria-modal="true" aria-labelledby="proxyTestTitle">
+    <button type="button" class="proxy-result-x" id="proxyTestResultClose" title="Cerrar" aria-label="Cerrar">✕</button>
+    <div id="proxyTestStatus" class="proxy-result-hero is-ok">
+      <div class="proxy-result-glow" aria-hidden="true"></div>
+      <span class="proxy-result-badge" id="proxyTestIcon">✓</span>
+      <div class="proxy-result-hero-text">
+        <h2 id="proxyTestTitle">Proxy funcionando</h2>
+        <p id="proxyTestHeadline">Proxy OK</p>
+        <span id="proxyTestSubline" class="proxy-result-sub">Listo para asignar a tarjetas</span>
+      </div>
+    </div>
+    <div class="proxy-result-body">
+      <div class="proxy-result-tiles">
+        <div class="proxy-result-tile accent">
+          <span class="proxy-result-k">IP de salida</span>
+          <code id="proxyTestIp" class="proxy-result-v mono">—</code>
+          <button type="button" class="proxy-result-copy" id="proxyTestCopyIp">Copiar</button>
+        </div>
+        <div class="proxy-result-tile">
+          <span class="proxy-result-k">País / ciudad</span>
+          <strong id="proxyTestCountry" class="proxy-result-v">—</strong>
+        </div>
+        <div class="proxy-result-tile">
+          <span class="proxy-result-k">Latencia</span>
+          <strong id="proxyTestLatency" class="proxy-result-v">—</strong>
+        </div>
+        <div class="proxy-result-tile wide">
+          <span class="proxy-result-k">Endpoint</span>
+          <code id="proxyTestEndpoint" class="proxy-result-v mono small">—</code>
+        </div>
+      </div>
+      <p id="proxyTestHint" class="proxy-result-hint">
+        Las herramientas con este proxy deben salir por esa IP y país.
+      </p>
+      <p id="proxyTestError" class="proxy-result-err hidden"></p>
+    </div>
+    <div class="proxy-result-actions">
+      <button type="button" class="proxy-result-btn" id="proxyTestResultOk">Entendido</button>
+    </div>
+  </div>
+</div>
+
+<div class="dic-modal-overlay" id="proxyModal">
+    <div class="dic-modal">
+      <div class="dic-modal-head">
+        <h2>Añadir proxy</h2>
+        <span class="dic-modal-close" id="proxyModalClose">✕</span>
+      </div>
+      <div class="dic-modal-body">
+        <div class="dic-mfield">
+          <label><span class="dic-req">*</span> Observación / Nombre</label>
+          <input class="dic-input full" id="pmName" placeholder="Ej: Proxy US 1" maxlength="30">
+        </div>
+        <div class="dic-mfield">
+          <label><span class="dic-req">*</span> Tipo de proxy</label>
+          <select class="dic-input full" id="pmType">
+            <option value="socks5">SOCKS5 (recomendado residencial)</option>
+            <option value="socks4">SOCKS4</option>
+            <option value="http">HTTP</option>
+            <option value="https">HTTPS</option>
+          </select>
+        </div>
+        <div class="dic-mfield">
+          <label><span class="dic-req">*</span> IP / Host</label>
+          <input class="dic-input full" id="pmHost" placeholder="Ej: 192.168.1.50 (solo IP o host, sin socks5://)">
+        </div>
+        <div class="dic-mfield">
+          <label><span class="dic-req">*</span> Puerto</label>
+          <input class="dic-input full" id="pmPort" placeholder="Ej: 1080">
+        </div>
+        <div class="dic-mfield">
+          <label>Usuario</label>
+          <input class="dic-input full" id="pmUser" placeholder="Opcional">
+        </div>
+        <div class="dic-mfield">
+          <label>Contraseña</label>
+          <input class="dic-input full" id="pmPass" placeholder="Opcional">
+        </div>
+      </div>
+      <div class="dic-modal-footer">
+        <button class="dic-btn-dark" id="proxyModalCancel">Cancelar</button>
+        <button class="dic-btn-green" id="proxyModalConfirm">Guardar Proxy</button>
+      </div>
+    </div>
+  </div>
+
+<div class="dic-modal-overlay" id="extModal">
+    <div class="dic-modal" style="width: 500px;">
+      <div class="dic-modal-head">
+        <h2 style="text-align:center; width:100%; font-size:16px;">Extensión añadida</h2>
+        <span class="dic-modal-close" id="extModalClose" style="position:absolute; right:20px;">✕</span>
+      </div>
+      <div class="dic-modal-body">
+        
+        <div class="dic-mfield" style="display:flex; align-items:center; gap: 16px; margin-bottom: 24px;">
+          <label style="margin:0; min-width:120px;">Método añadir</label>
+          <div class="ext-method-switch" id="extMethodSwitch">
+            <button type="button" class="ext-method-btn active" data-method="store">Chrome Store</button>
+            <button type="button" class="ext-method-btn" data-method="package">Subir paquete</button>
+          </div>
+        </div>
+
+        <div class="dic-mfield" id="extUriField">
+          <label><span class="dic-req">*</span> URI extensión</label>
+          <input class="dic-input full" id="extUri" placeholder="Ingrese la URL de la extensión.">
+          <p style="font-size:11px; color:var(--muted); margin-top:6px;">Ingrese URI de página de detalles en <a href="#" style="color:#fff; text-decoration:underline;">Chrome Store</a></p>
+        </div>
+
+        <div class="dic-mfield hidden" id="extPackageField">
+          <label><span class="dic-req">*</span> Paquete extension</label>
+          <input class="dic-input full ext-file-input" id="extPackage" type="file" accept=".zip,.crx">
+          <p class="dic-help">Selecciona un archivo .zip o .crx local. Solo se guarda el nombre dentro de esta app.</p>
+        </div>
+
+        <div class="dic-mfield">
+          <label><span class="dic-req">*</span> Grupo extensión</label>
+          <select class="dic-select full" id="extGroupSelect">
+            <option value="Sin agrupar">Sin agrupar ✕</option>
+            <option value="IAMAX">IAMAX</option>
+            <option value="GROK">GROK</option>
+          </select>
+        </div>
+
+        <div style="text-align:center; margin: 16px 0;">
+          <button type="button" style="background:none; border:none; color:var(--accent); cursor:pointer; font-size:12px;">Más ⌄</button>
+        </div>
+
+        <div class="dic-mfield">
+          <label><span class="dic-req">*</span> Opciones de fijado ⓘ</label>
+          <select class="dic-select full" id="extPin">
+            <option value="Personalizado">Personalizado (fijar manualmente)</option>
+            <option value="Siempre">Fijar siempre en barra</option>
+            <option value="No_fijar">No fijar en barra</option>
+          </select>
+        </div>
+
+      </div>
+      <div class="dic-modal-footer" style="justify-content:center; gap: 24px; padding: 20px;">
+        <button class="dic-btn-dark" id="extModalCancel" style="width: 140px;">Cancelar</button>
+        <button class="dic-btn-green" id="extModalConfirm" style="width: 140px;">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- CLIENT MODAL -->
+  <div id="clientModal" class="dic-modal-overlay client-modal-overlay" aria-hidden="true">
+    <div class="dic-modal client-modal-card" role="dialog" aria-modal="true" aria-labelledby="clientModalTitle">
+      <div class="dic-modal-head">
+        <div>
+          <p class="client-modal-kicker">GESTIÓN DE ACCESO</p>
+          <h2 id="clientModalTitle">Crear cliente</h2>
+        </div>
+        <button class="client-modal-close" id="clientModalClose" type="button" aria-label="Cerrar">&times;</button>
+      </div>
+      <form id="clientForm" class="client-modal-form">
+        <input type="hidden" id="clientIdInput" value="" />
+        <div class="client-modal-grid">
+        <div class="dic-mfield client-field-wide">
+          <label for="clientEmailInput"><span class="dic-req">*</span> Correo del cliente</label>
+          <input id="clientEmailInput" type="email" placeholder="cliente@correo.com" required class="dic-input full" autocomplete="email" />
+        </div>
+        <div class="dic-mfield client-field-wide">
+          <label for="clientPhoneInput">Teléfono <span class="muted" style="font-weight:500;text-transform:none;">(opcional)</span></label>
+          <input id="clientPhoneInput" type="tel" placeholder="Ej. 591 70000000" class="dic-input full" autocomplete="tel" />
+        </div>
+        <div class="dic-mfield client-field-wide">
+          <label for="clientPasswordInput">Contraseña</label>
+          <div class="client-password-row">
+            <input id="clientPasswordInput" type="text" placeholder="Obligatoria al crear; opcional al editar" class="dic-input" autocomplete="new-password" />
+            <button type="button" id="generatePasswordBtn" class="dic-btn-dark">Generar</button>
+          </div>
+        </div>
+        <div class="dic-mfield">
+          <label for="clientPlanSelect">Plan de acceso</label>
+          <select id="clientPlanSelect" class="dic-select full">
+            <option value="standard">Estándar</option>
+            <option value="ultra">Ultra (Acceso a todo)</option>
+          </select>
+        </div>
+        <div class="dic-mfield">
+          <label for="clientProfileGroupSelect">Grupo de perfiles</label>
+          <select id="clientProfileGroupSelect" class="dic-select full">
+            <option value="">Sin grupo (acceso general)</option>
+          </select>
+        </div>
+        <div class="dic-mfield">
+          <label for="clientStatusSelect">Estado</label>
+          <select id="clientStatusSelect" class="dic-select full">
+            <option value="active">Activo</option>
+            <option value="suspended">Suspendido</option>
+          </select>
+        </div>
+        <div class="dic-mfield">
+          <label for="clientExpiresInput">Fecha de expiración</label>
+          <input id="clientExpiresInput" type="date" class="dic-input full" />
+        </div>
+        </div>
+        <div class="dic-modal-footer client-modal-actions">
+          <button class="dic-btn-dark" id="clientModalCancel" type="button">Cancelar</button>
+          <button class="dic-btn-green" id="saveClientBtn" type="submit">Guardar cliente</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

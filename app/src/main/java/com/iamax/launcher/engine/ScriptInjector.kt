@@ -25,7 +25,9 @@ class ScriptInjector(private val context: Context) {
             "scripts/gemini_shield.js",
             "scripts/chatgpt_ip_check.js",
             "scripts/bot_autologin.js",
-            "scripts/streaming_adblock.js"
+            "scripts/streaming_adblock.js",
+            "scripts/auto_injector.js",
+            "scripts/credential_mask.js"
         )
 
         for (path in scriptPaths) {
@@ -101,6 +103,7 @@ class ScriptInjector(private val context: Context) {
         injectCss(webView, "scripts/shield.css")
         injectJs(webView, "scripts/universal_shield.js")
         injectJs(webView, "scripts/clear_cache_btn.js")
+        injectJs(webView, "scripts/auto_injector.js")
 
         // Spoof check exclusions
         val isExcludedSpoof = lowerUrl.contains("scribd.com") ||

@@ -32,7 +32,7 @@ export function isSafeUpdateUrl(value) {
     const parsed = new URL(String(value || "").trim());
     if (parsed.protocol !== "https:") return false;
     const host = parsed.hostname.toLowerCase();
-    return host.endsWith(".railway.app") || host.endsWith(".iamax.com") || host === "localhost";
+    return host === "iamaxbotcrm.online" || host.endsWith(".iamaxbotcrm.online") || host.endsWith(".iamax.com") || host === "localhost";
   } catch {
     return false;
   }
