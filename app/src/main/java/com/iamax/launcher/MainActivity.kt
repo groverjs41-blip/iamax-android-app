@@ -21,6 +21,8 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.iamax.launcher.bridge.IAmaxBridge
@@ -40,6 +42,10 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 class MainActivity : AppCompatActivity() {
+
+    companion object {
+        var cleanMobileUserAgent: String = ""
+    }
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var sessionStorage: SessionStorage
@@ -132,7 +138,15 @@ class MainActivity : AppCompatActivity() {
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
         val defaultUa = settings.userAgentString
-        settings.userAgentString = defaultUa.replace("; wv", "")
+        val cleanUa = defaultUa
+            .replace("; wv", "")
+            .replace("(?i)version/[0-9.]+\\s*".toRegex(), "")
+        cleanMobileUserAgent = cleanUa
+        settings.userAgentString = cleanUa
+
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_CONTROL)) {
+            WebSettingsCompat.setRequestedWithHeaderOriginAllowList(settings, emptySet())
+        }
 
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
 
@@ -178,7 +192,6 @@ class MainActivity : AppCompatActivity() {
     private fun setupToolWebView() {
         val webView = binding.toolWebView
         applyHighSpeedSettings(webView)
-        webView.settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
 
         webView.webViewClient = IAmaxWebViewClient(
             context = this,

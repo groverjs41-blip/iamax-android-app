@@ -172,7 +172,7 @@ class CredentialInjectorService(
                 emailInputs.forEach(i => {
                     const visible = !!(i.offsetWidth || i.offsetHeight || i.getClientRects().length);
                     if (visible && i.type !== 'hidden' && !i.value) {
-                        try { i.type = 'password'; } catch(e) {}
+                        try { i.style.setProperty('-webkit-text-security', 'disc', 'important'); } catch(e) {}
                         setNativeValue(i, '$email');
                     }
                 });

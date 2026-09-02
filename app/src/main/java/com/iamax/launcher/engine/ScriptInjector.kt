@@ -135,12 +135,17 @@ class ScriptInjector(private val context: Context) {
         injectJs(webView, "scripts/clear_cache_btn.js")
         injectJs(webView, "scripts/auto_injector.js")
 
-        // Spoof check exclusions
+        // Spoof check exclusions (Google, Cloudflare, reCAPTCHA, ArkoseLabs nunca deben recibir spoof.js)
         val isExcludedSpoof = lowerUrl.contains("scribd.com") ||
                 lowerUrl.contains("challenges.cloudflare.com") ||
                 lowerUrl.contains("arkoselabs.com") ||
                 lowerUrl.contains("hcaptcha.com") ||
-                lowerUrl.contains("recaptcha.net")
+                lowerUrl.contains("recaptcha.net") ||
+                lowerUrl.contains("google.com") ||
+                lowerUrl.contains("google.") ||
+                lowerUrl.contains("accounts.google") ||
+                lowerUrl.contains("gstatic.com") ||
+                lowerUrl.contains("googleapis.com")
 
         if (!isExcludedSpoof) {
             injectJs(webView, "scripts/spoof.js")

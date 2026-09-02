@@ -7,6 +7,7 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.iamax.launcher.MainActivity
 import com.iamax.launcher.engine.CookieInjector
 import com.iamax.launcher.engine.CredentialInjectorService
 import com.iamax.launcher.storage.SessionStorage
@@ -42,6 +43,40 @@ class IAmaxBridge(
         .build()
 
     private val defaultDesktopUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+
+    private fun resolveOptimalUserAgent(targetUrl: String, cardUserAgent: String?): String {
+        val lower = targetUrl.lowercase()
+        val isGoogle = lower.contains("accounts.google.") || 
+                       lower.contains("google.com") || 
+                       lower.contains("google.") ||
+                       lower.contains("youtube.com") ||
+                       lower.contains("gmail.com")
+
+        // Para Google (incluyendo cualquier card con OAuth de Google como Nano Banana):
+        // NUNCA enviar User-Agent de Windows Desktop ni WebView (; wv).
+        // Se debe usar siempre el User-Agent limpio nativo de Chrome Android.
+        if (isGoogle) {
+            return MainActivity.cleanMobileUserAgent.ifBlank {
+                "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"
+            }
+        }
+
+        // Si la tarjeta trae un UA explícito no-Google configurado
+        if (!cardUserAgent.isNullOrBlank() && !cardUserAgent.contains("Google", ignoreCase = true)) {
+            return cardUserAgent
+        }
+
+        // Para IAs conocidas que admiten desktop (ChatGPT, Claude, Grok)
+        if (lower.contains("chatgpt.com") || lower.contains("openai.com") || 
+            lower.contains("claude.ai") || lower.contains("grok.com")) {
+            return defaultDesktopUserAgent
+        }
+
+        // Para cualquier otra herramienta, usar el User-Agent limpio nativo de Chrome
+        return MainActivity.cleanMobileUserAgent.ifBlank {
+            "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"
+        }
+    }
 
     @JavascriptInterface
     fun handleMessage(jsonMessage: String): String {
@@ -153,7 +188,7 @@ class IAmaxBridge(
 
                     if (targetUrl.isNotBlank() && targetUrl.startsWith("http")) {
                         activity.runOnUiThread {
-                            val finalUa = if (userAgent.isNotBlank()) userAgent else defaultDesktopUserAgent
+                            val finalUa = resolveOptimalUserAgent(targetUrl, userAgent)
                             onApplyUserAgent(finalUa)
                             onNavigateToUrl(targetUrl)
                         }
@@ -180,7 +215,7 @@ class IAmaxBridge(
 
                     if (targetUrl.isNotBlank() && targetUrl.startsWith("http")) {
                         activity.runOnUiThread {
-                            val finalUa = if (userAgent.isNotBlank()) userAgent else defaultDesktopUserAgent
+                            val finalUa = resolveOptimalUserAgent(targetUrl, userAgent)
                             onApplyUserAgent(finalUa)
                             onNavigateToUrl(targetUrl)
                         }
@@ -199,7 +234,7 @@ class IAmaxBridge(
 
                     if (targetUrl.isNotBlank() && targetUrl.startsWith("http")) {
                         activity.runOnUiThread {
-                            val finalUa = if (userAgent.isNotBlank()) userAgent else defaultDesktopUserAgent
+                            val finalUa = resolveOptimalUserAgent(targetUrl, userAgent)
                             onApplyUserAgent(finalUa)
                             onNavigateToUrl(targetUrl)
                         }

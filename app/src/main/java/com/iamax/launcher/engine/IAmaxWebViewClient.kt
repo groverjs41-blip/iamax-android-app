@@ -12,6 +12,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ProgressBar
 import androidx.webkit.WebViewAssetLoader
+import com.iamax.launcher.MainActivity
 import com.iamax.launcher.storage.SessionStorage
 
 class IAmaxWebViewClient(
@@ -46,7 +47,14 @@ class IAmaxWebViewClient(
 
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val url = request.url.toString()
+        val lower = url.lowercase()
         Log.d("IAmaxWebViewClient", "Loading URL: $url")
+        if (lower.contains("accounts.google.") || lower.contains("google.com/signin") || lower.contains("google.com/servicelogin")) {
+            val cleanUa = MainActivity.cleanMobileUserAgent
+            if (cleanUa.isNotBlank() && view.settings.userAgentString != cleanUa) {
+                view.settings.userAgentString = cleanUa
+            }
+        }
         return false
     }
 
@@ -54,6 +62,13 @@ class IAmaxWebViewClient(
         super.onPageStarted(view, url, favicon)
         progressBar.visibility = View.VISIBLE
         val isDashboard = isDashboardUrl(url)
+        val lower = url.lowercase()
+        if (lower.contains("accounts.google.") || lower.contains("google.com/signin") || lower.contains("google.com/servicelogin")) {
+            val cleanUa = MainActivity.cleanMobileUserAgent
+            if (cleanUa.isNotBlank() && view.settings.userAgentString != cleanUa) {
+                view.settings.userAgentString = cleanUa
+            }
+        }
         onNavigationStateChanged(url, isDashboard)
         scriptInjector.onPageStarted(view, url)
 
