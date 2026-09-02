@@ -456,77 +456,8 @@ class IAmaxBridge(
     }
 
     private fun saveRawBytes(bytes: ByteArray, fileName: String, mimeType: String) {
-        try {
-            val lowerMime = mimeType.lowercase()
-            val safeFileName = if (fileName.isNotBlank()) fileName else "descarga_${System.currentTimeMillis()}"
-            val finalFileName = if (!safeFileName.contains(".")) {
-                when {
-                    lowerMime.contains("audio") || lowerMime.contains("mpeg") || lowerMime.contains("mp3") -> "$safeFileName.mp3"
-                    lowerMime.contains("wav") -> "$safeFileName.wav"
-                    lowerMime.contains("m4a") || lowerMime.contains("aac") -> "$safeFileName.m4a"
-                    lowerMime.contains("ogg") -> "$safeFileName.ogg"
-                    lowerMime.contains("video") || lowerMime.contains("mp4") -> "$safeFileName.mp4"
-                    lowerMime.contains("webm") -> "$safeFileName.webm"
-                    lowerMime.contains("png") -> "$safeFileName.png"
-                    lowerMime.contains("jpeg") || lowerMime.contains("jpg") -> "$safeFileName.jpg"
-                    lowerMime.contains("webp") -> "$safeFileName.webp"
-                    lowerMime.contains("gif") -> "$safeFileName.gif"
-                    lowerMime.contains("pdf") -> "$safeFileName.pdf"
-                    lowerMime.contains("json") -> "$safeFileName.json"
-                    lowerMime.contains("csv") -> "$safeFileName.csv"
-                    lowerMime.contains("zip") -> "$safeFileName.zip"
-                    lowerMime.contains("excel") || lowerMime.contains("spreadsheet") -> "$safeFileName.xlsx"
-                    else -> "$safeFileName.bin"
-                }
-            } else safeFileName
-
-            val resolvedMime = when {
-                finalFileName.endsWith(".mp3") -> "audio/mpeg"
-                finalFileName.endsWith(".wav") -> "audio/wav"
-                finalFileName.endsWith(".m4a") -> "audio/mp4"
-                finalFileName.endsWith(".ogg") -> "audio/ogg"
-                finalFileName.endsWith(".mp4") -> "video/mp4"
-                finalFileName.endsWith(".webm") -> "video/webm"
-                finalFileName.endsWith(".png") -> "image/png"
-                finalFileName.endsWith(".jpg") || finalFileName.endsWith(".jpeg") -> "image/jpeg"
-                finalFileName.endsWith(".webp") -> "image/webp"
-                finalFileName.endsWith(".gif") -> "image/gif"
-                finalFileName.endsWith(".pdf") -> "application/pdf"
-                finalFileName.endsWith(".json") -> "application/json"
-                finalFileName.endsWith(".csv") -> "text/csv"
-                finalFileName.endsWith(".xlsx") -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                finalFileName.endsWith(".zip") -> "application/zip"
-                else -> if (mimeType.isNotBlank()) mimeType else "application/octet-stream"
-            }
-
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                val values = android.content.ContentValues().apply {
-                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, finalFileName)
-                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, resolvedMime)
-                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
-                }
-                val uri = activity.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                if (uri != null) {
-                    activity.contentResolver.openOutputStream(uri)?.use { os ->
-                        os.write(bytes)
-                    }
-                }
-            } else {
-                val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
-                downloadsDir.mkdirs()
-                val file = java.io.File(downloadsDir, finalFileName)
-                file.outputStream().use { os -> os.write(bytes) }
-                android.media.MediaScannerConnection.scanFile(activity, arrayOf(file.absolutePath), arrayOf(resolvedMime), null)
-            }
-
-            activity.runOnUiThread {
-                Toast.makeText(activity, "Descargado en Descargas: $finalFileName", Toast.LENGTH_LONG).show()
-            }
-        } catch (e: Exception) {
-            Log.e("IAmaxBridge", "Error in saveRawBytes: ${e.message}", e)
-            activity.runOnUiThread {
-                Toast.makeText(activity, "Error al guardar archivo: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+        activity.runOnUiThread {
+            (activity as? MainActivity)?.promptUserWhereToSave(bytes, fileName, mimeType)
         }
     }
 
@@ -534,34 +465,7 @@ class IAmaxBridge(
     fun downloadHttpFile(urlStr: String, fileNameStr: String, mimeTypeStr: String) {
         if (urlStr.isBlank()) return
         activity.runOnUiThread {
-            try {
-                val uri = Uri.parse(urlStr)
-                val guessedName = if (fileNameStr.isNotBlank()) fileNameStr else URLUtil.guessFileName(urlStr, null, mimeTypeStr)
-                val safeMime = if (mimeTypeStr.isNotBlank()) mimeTypeStr else {
-                    val ext = MimeTypeMap.getFileExtensionFromUrl(urlStr)
-                    if (ext.isNotBlank()) MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.lowercase()) else null
-                } ?: "application/octet-stream"
-
-                val cookies = CookieManager.getInstance().getCookie(urlStr) ?: ""
-                val ua = MainActivity.cleanMobileUserAgent
-
-                val request = DownloadManager.Request(uri).apply {
-                    setMimeType(safeMime)
-                    if (ua.isNotBlank()) addRequestHeader("User-Agent", ua)
-                    if (cookies.isNotBlank()) addRequestHeader("Cookie", cookies)
-                    setDescription("Descargando archivo...")
-                    setTitle(guessedName)
-                    setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                    setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, guessedName)
-                }
-
-                val dm = activity.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                dm.enqueue(request)
-                Toast.makeText(activity, "Descargando en Descargas: $guessedName", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Log.e("IAmaxBridge", "Error starting download for $urlStr: ${e.message}", e)
-                Toast.makeText(activity, "Error al descargar: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+            (activity as? MainActivity)?.downloadUrlWithAuth(urlStr, fileNameStr, mimeTypeStr)
         }
     }
 

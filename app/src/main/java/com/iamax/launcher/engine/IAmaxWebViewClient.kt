@@ -70,7 +70,7 @@ class IAmaxWebViewClient(
 
         if (isDownloadExt || hasDownloadParam) {
             (context as? MainActivity)?.let { mainAct ->
-                mainAct.showDownloadConfirmationDialog("archivo", url)
+                mainAct.downloadUrlWithAuth(url, "", "")
                 return true
             }
         }
