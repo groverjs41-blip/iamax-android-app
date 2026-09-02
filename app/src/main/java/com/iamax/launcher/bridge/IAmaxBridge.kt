@@ -79,7 +79,7 @@ class IAmaxBridge(
         }
     }
 
-    private fun clearGoogleSessionState(targetUrl: String, loginMethod: String?) {
+    private fun clearToolStorageAndSession(targetUrl: String, loginMethod: String?) {
         val lowerUrl = targetUrl.lowercase()
         val isGoogle = (loginMethod != null && loginMethod.equals("google", ignoreCase = true)) ||
                        lowerUrl.contains("accounts.google.") ||
@@ -87,24 +87,70 @@ class IAmaxBridge(
                        lowerUrl.contains("google.") ||
                        lowerUrl.contains("youtube.com") ||
                        lowerUrl.contains("gemini.google") ||
-                       lowerUrl.contains("nanobanana")
+                       lowerUrl.contains("banana")
 
-        if (isGoogle) {
-            Log.d("IAmaxBridge", "Isolating Google profile: clearing previous Google account cookies & storage")
-            cookieInjector.clearGoogleSession()
+        try {
+            val uri = Uri.parse(targetUrl)
+            val host = uri.host ?: ""
+            val origin = if (uri.scheme != null && uri.host != null) "${uri.scheme}://${uri.host}" else ""
+
+            if (host.isNotBlank()) {
+                cookieInjector.clearCookies(host)
+                cookieInjector.clearCookies(".$host")
+                val parts = host.split(".")
+                if (parts.size >= 2) {
+                    val root = "${parts[parts.size - 2]}.${parts[parts.size - 1]}"
+                    if (root != host) {
+                        cookieInjector.clearCookies(root)
+                        cookieInjector.clearCookies(".$root")
+                    }
+                }
+            }
+
+            if (isGoogle) {
+                Log.d("IAmaxBridge", "Isolating Google profile: clearing Google cookies & storage")
+                cookieInjector.clearGoogleSession()
+            }
+
             activity.runOnUiThread {
                 try {
                     val ws = WebStorage.getInstance()
-                    ws.deleteOrigin("https://accounts.google.com")
-                    ws.deleteOrigin("https://google.com")
-                    ws.deleteOrigin("https://www.google.com")
-                    ws.deleteOrigin("https://myaccount.google.com")
-                    ws.deleteOrigin("https://gemini.google.com")
-                    ws.deleteOrigin("https://youtube.com")
+                    if (origin.isNotBlank()) ws.deleteOrigin(origin)
+                    if (host.isNotBlank()) {
+                        ws.deleteOrigin("https://$host")
+                        ws.deleteOrigin("http://$host")
+                    }
+                    if (isGoogle) {
+                        ws.deleteOrigin("https://accounts.google.com")
+                        ws.deleteOrigin("https://google.com")
+                        ws.deleteOrigin("https://www.google.com")
+                        ws.deleteOrigin("https://myaccount.google.com")
+                        ws.deleteOrigin("https://gemini.google.com")
+                        ws.deleteOrigin("https://youtube.com")
+                    }
+
+                    val toolView = toolWebViewProvider()
+                    toolView.evaluateJavascript(
+                        """
+                        (function() {
+                            try { localStorage.clear(); } catch(e){}
+                            try { sessionStorage.clear(); } catch(e){}
+                            try {
+                                if (window.indexedDB && window.indexedDB.databases) {
+                                    window.indexedDB.databases().then(function(dbs) {
+                                        dbs.forEach(function(db) { window.indexedDB.deleteDatabase(db.name); });
+                                    }).catch(function(){});
+                                }
+                            } catch(e){}
+                        })();
+                        """.trimIndent(), null
+                    )
                 } catch (e: Exception) {
-                    Log.w("IAmaxBridge", "Error deleting Google web storage: ${e.message}")
+                    Log.w("IAmaxBridge", "Error clearing tool web storage: ${e.message}")
                 }
             }
+        } catch (e: Exception) {
+            Log.w("IAmaxBridge", "Error in clearToolStorageAndSession: ${e.message}")
         }
     }
 
@@ -126,7 +172,10 @@ class IAmaxBridge(
                     if (cardId.isNotBlank()) {
                         sessionStorage.setString("activeCardId", cardId)
                     }
-                    clearGoogleSessionState(targetUrl, loginMethod)
+                    val lowerUrl = targetUrl.lowercase()
+                    if (loginMethod.equals("google", ignoreCase = true) || lowerUrl.contains("accounts.google.") || lowerUrl.contains("banana")) {
+                        clearToolStorageAndSession(targetUrl, loginMethod)
+                    }
 
                     var cookiesJson = ""
                     var lsJson = ""
@@ -235,14 +284,10 @@ class IAmaxBridge(
                     if (cardId.isNotBlank()) {
                         sessionStorage.setString("activeCardId", cardId)
                     }
-                    clearGoogleSessionState(targetUrl, loginMethod)
 
                     val dontClear = message.get("dontClearCookies")?.asBoolean ?: false
                     if (!dontClear && targetUrl.isNotBlank()) {
-                        try {
-                            val domain = Uri.parse(targetUrl).host
-                            cookieInjector.clearCookies(domain)
-                        } catch (_: Exception) {}
+                        clearToolStorageAndSession(targetUrl, loginMethod)
                     }
 
                     response.addProperty("success", true)
@@ -264,7 +309,7 @@ class IAmaxBridge(
                     if (cardId.isNotBlank()) {
                         sessionStorage.setString("activeCardId", cardId)
                     }
-                    clearGoogleSessionState(targetUrl, loginMethod)
+                    clearToolStorageAndSession(targetUrl, loginMethod)
 
                     response.addProperty("success", true)
 

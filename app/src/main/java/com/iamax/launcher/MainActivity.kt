@@ -221,10 +221,37 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    fun showToolLoader(title: String = "Iniciando perfil seguro...", subtitle: String = "Aislando sesión y cargando recursos...") {
+        runOnUiThread {
+            binding.tvLoadingTitle.text = title
+            binding.tvLoadingSubtitle.text = subtitle
+            binding.toolLoadingOverlay.alpha = 1f
+            binding.toolLoadingOverlay.visibility = View.VISIBLE
+            binding.progressBar.visibility = View.VISIBLE
+        }
+    }
+
+    fun hideToolLoader() {
+        runOnUiThread {
+            if (binding.toolLoadingOverlay.visibility == View.VISIBLE) {
+                binding.toolLoadingOverlay.animate()
+                    .alpha(0f)
+                    .setDuration(250)
+                    .withEndAction {
+                        binding.toolLoadingOverlay.visibility = View.GONE
+                        binding.toolLoadingOverlay.alpha = 1f
+                    }
+                    .start()
+            }
+            binding.progressBar.visibility = View.GONE
+        }
+    }
+
     private fun openToolUrl(url: String) {
         binding.dashboardWebView.visibility = View.GONE
         binding.toolWebView.visibility = View.VISIBLE
         binding.floatingNavBarScroll.visibility = View.VISIBLE
+        showToolLoader()
         binding.toolWebView.loadUrl(url)
     }
 
@@ -233,6 +260,9 @@ class MainActivity : AppCompatActivity() {
         binding.dashboardWebView.visibility = View.VISIBLE
         binding.floatingNavBarScroll.visibility = View.GONE
         binding.progressBar.visibility = View.GONE
+        binding.toolLoadingOverlay.visibility = View.GONE
+        // Descargar toolWebView a about:blank para liberar memoria y evitar que la sesión anterior persista
+        binding.toolWebView.loadUrl("about:blank")
     }
 
     private fun setupFloatingBar() {

@@ -16,7 +16,7 @@ import com.iamax.launcher.MainActivity
 import com.iamax.launcher.storage.SessionStorage
 
 class IAmaxWebViewClient(
-    context: Context,
+    private val context: Context,
     private val scriptInjector: ScriptInjector,
     private val sessionStorage: SessionStorage,
     private val credentialInjectorService: CredentialInjectorService,
@@ -91,6 +91,7 @@ class IAmaxWebViewClient(
         scriptInjector.onPageFinished(view, url)
 
         if (!isDashboard) {
+            (context as? MainActivity)?.hideToolLoader()
             val activeCardId = sessionStorage.getString("activeCardId", "")
             if (activeCardId.isNotBlank()) {
                 val pendingLs = sessionStorage.getString("pending_ls_$activeCardId", "")
