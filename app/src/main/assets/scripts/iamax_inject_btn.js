@@ -43,42 +43,73 @@
 
         // Un solo botón: no superponer al cyan de Chromium ni duplicar
         if (document.getElementById("iamax-inject-btn") || document.querySelector("button[data-iamax-inject='1']")) return;
-        if (document.getElementById("iamax-inject-floating-btn")) return;
+        if (document.getElementById("iamax-inject-floating-btn") || document.getElementById("iamax-inject-floating-container")) return;
+
+        const container = document.createElement("div");
+        container.id = "iamax-inject-floating-container";
+        container.style.cssText = `
+            position: fixed !important;
+            bottom: 24px !important;
+            right: 20px !important;
+            z-index: 2147483647 !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            font-family: system-ui, -apple-system, sans-serif !important;
+        `;
 
         const btn = document.createElement("button");
         btn.id = "iamax-inject-floating-btn";
         btn.setAttribute("data-iamax-inject", "1");
-        btn.innerHTML = "⚡ Inyectar IAmax";
-        
-        // Stylish and prominent styling with !important to override Canva
+        btn.innerHTML = "⚡ Inyectar";
         btn.style.cssText = `
-            position: fixed !important;
-            bottom: 30px !important;
-            right: 30px !important;
-            z-index: 2147483647 !important;
-            padding: 12px 24px !important;
-            background: linear-gradient(135deg, #ff0055, #cc0044) !important;
+            padding: 10px 18px !important;
+            background: linear-gradient(135deg, #6366F1, #4F46E5) !important;
             color: white !important;
             border: none !important;
-            border-radius: 30px !important;
-            font-size: 15px !important;
+            border-radius: 25px !important;
+            font-size: 14px !important;
             font-weight: bold !important;
             cursor: pointer !important;
-            box-shadow: 0 4px 15px rgba(255, 0, 85, 0.5) !important;
-            font-family: system-ui, -apple-system, sans-serif !important;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.5) !important;
             transition: all 0.2s ease !important;
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
         `;
+
+        const closeBtn = document.createElement("button");
+        closeBtn.innerHTML = "✕";
+        closeBtn.title = "Ocultar botón";
+        closeBtn.style.cssText = `
+            width: 26px !important;
+            height: 26px !important;
+            border-radius: 50% !important;
+            background: rgba(15, 23, 42, 0.8) !important;
+            color: #94A3B8 !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            font-size: 13px !important;
+            cursor: pointer !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 0 !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+        `;
+        closeBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            container.remove();
+            window.__iamaxAllowInjectBtn = false;
+        };
+
+        container.appendChild(btn);
+        container.appendChild(closeBtn);
 
         btn.addEventListener("mouseover", () => {
             btn.style.setProperty("transform", "scale(1.05)", "important");
-            btn.style.setProperty("box-shadow", "0 6px 20px rgba(255, 0, 85, 0.7)", "important");
+            btn.style.setProperty("box-shadow", "0 6px 20px rgba(99, 102, 241, 0.7)", "important");
         });
         btn.addEventListener("mouseout", () => {
             btn.style.setProperty("transform", "scale(1)", "important");
-            btn.style.setProperty("box-shadow", "0 4px 15px rgba(255, 0, 85, 0.5)", "important");
+            btn.style.setProperty("box-shadow", "0 4px 15px rgba(99, 102, 241, 0.5)", "important");
         });
 
         btn.addEventListener("click", () => {
@@ -91,15 +122,15 @@
                     btn.style.setProperty("background", "linear-gradient(135deg, #00cc66, #00994d)", "important");
                     window.__iamaxInjectDone = true;
                     window.__iamaxAllowInjectBtn = false;
-                    setTimeout(() => btn.remove(), 1000);
+                    setTimeout(() => container.remove(), 1000);
                 } else {
                     console.error("Injection error:", response);
                     const errMsg = response && response.error ? response.error : "Reintenta";
                     btn.innerHTML = "❌ " + errMsg.substring(0, 20);
                     btn.style.setProperty("background", "linear-gradient(135deg, #cc0000, #990000)", "important");
                     setTimeout(() => {
-                        btn.innerHTML = "⚡ Inyectar IAmax";
-                        btn.style.setProperty("background", "linear-gradient(135deg, #ff0055, #cc0044)", "important");
+                        btn.innerHTML = "⚡ Inyectar";
+                        btn.style.setProperty("background", "linear-gradient(135deg, #6366F1, #4F46E5)", "important");
                     }, 4000);
                 }
             });
@@ -107,9 +138,9 @@
 
         const mountBtn = () => {
             if (document.body) {
-                document.body.appendChild(btn);
+                document.body.appendChild(container);
             } else if (document.documentElement) {
-                document.documentElement.appendChild(btn);
+                document.documentElement.appendChild(container);
             }
         };
 

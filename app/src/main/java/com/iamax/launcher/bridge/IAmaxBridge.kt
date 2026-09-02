@@ -1,11 +1,18 @@
 package com.iamax.launcher.bridge
 
 import android.app.Activity
+import android.app.DownloadManager
+import android.content.Context
 import android.net.Uri
+import android.os.Environment
 import android.util.Log
+import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
+import android.webkit.MimeTypeMap
+import android.webkit.URLUtil
 import android.webkit.WebStorage
 import android.webkit.WebView
+import android.widget.Toast
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.iamax.launcher.MainActivity
@@ -108,28 +115,20 @@ class IAmaxBridge(
             }
 
             if (isGoogle) {
-                Log.d("IAmaxBridge", "Isolating Google profile: clearing Google cookies & storage")
+                Log.d("IAmaxBridge", "Isolating Google profile: clearing all cookies & storage")
                 cookieInjector.clearGoogleSession()
             }
 
             activity.runOnUiThread {
                 try {
                     val ws = WebStorage.getInstance()
-                    if (origin.isNotBlank()) ws.deleteOrigin(origin)
-                    if (host.isNotBlank()) {
-                        ws.deleteOrigin("https://$host")
-                        ws.deleteOrigin("http://$host")
-                    }
-                    if (isGoogle) {
-                        ws.deleteOrigin("https://accounts.google.com")
-                        ws.deleteOrigin("https://google.com")
-                        ws.deleteOrigin("https://www.google.com")
-                        ws.deleteOrigin("https://myaccount.google.com")
-                        ws.deleteOrigin("https://gemini.google.com")
-                        ws.deleteOrigin("https://youtube.com")
-                    }
+                    ws.deleteAllData()
 
                     val toolView = toolWebViewProvider()
+                    toolView.clearCache(true)
+                    toolView.clearFormData()
+                    toolView.clearHistory()
+                    toolView.clearSslPreferences()
                     toolView.evaluateJavascript(
                         """
                         (function() {
@@ -397,6 +396,14 @@ class IAmaxBridge(
                     response.addProperty("success", true)
                 }
 
+                "DOWNLOAD_FILE", "DOWNLOAD_HTTP_FILE" -> {
+                    val fileUrl = message.get("url")?.asString ?: ""
+                    val fileName = message.get("filename")?.asString ?: message.get("name")?.asString ?: ""
+                    val mime = message.get("mimeType")?.asString ?: ""
+                    downloadHttpFile(fileUrl, fileName, mime)
+                    response.addProperty("success", true)
+                }
+
                 else -> {
                     Log.w("IAmaxBridge", "Unhandled message type: $type")
                     response.addProperty("warning", "Unhandled message type: $type")
@@ -458,6 +465,41 @@ class IAmaxBridge(
             Log.e("IAmaxBridge", "Error saving base64 file: ${e.message}", e)
             activity.runOnUiThread {
                 android.widget.Toast.makeText(activity, "Error al guardar archivo: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun downloadHttpFile(urlStr: String, fileNameStr: String, mimeTypeStr: String) {
+        if (urlStr.isBlank()) return
+        activity.runOnUiThread {
+            try {
+                val uri = Uri.parse(urlStr)
+                val guessedName = if (fileNameStr.isNotBlank()) fileNameStr else URLUtil.guessFileName(urlStr, null, mimeTypeStr)
+                val safeMime = if (mimeTypeStr.isNotBlank()) mimeTypeStr else {
+                    val ext = MimeTypeMap.getFileExtensionFromUrl(urlStr)
+                    if (ext.isNotBlank()) MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.lowercase()) else null
+                } ?: "application/octet-stream"
+
+                val cookies = CookieManager.getInstance().getCookie(urlStr) ?: ""
+                val ua = MainActivity.cleanMobileUserAgent
+
+                val request = DownloadManager.Request(uri).apply {
+                    setMimeType(safeMime)
+                    if (ua.isNotBlank()) addRequestHeader("User-Agent", ua)
+                    if (cookies.isNotBlank()) addRequestHeader("Cookie", cookies)
+                    setDescription("Descargando archivo...")
+                    setTitle(guessedName)
+                    setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, guessedName)
+                }
+
+                val dm = activity.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                dm.enqueue(request)
+                Toast.makeText(activity, "Descargando en Descargas: $guessedName", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Log.e("IAmaxBridge", "Error starting download for $urlStr: ${e.message}", e)
+                Toast.makeText(activity, "Error al descargar: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }

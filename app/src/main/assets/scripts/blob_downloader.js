@@ -1,4 +1,4 @@
-﻿// Universal Blob & Data URL downloader for Android WebView
+﻿// Universal Downloader for Android WebView (Handles Blob, Data URI, FileSaver.js, and HTTP download anchors)
 (function() {
     if (window.__iamaxBlobDownloaderInstalled) return;
     window.__iamaxBlobDownloaderInstalled = true;
@@ -21,20 +21,47 @@
             });
     }
 
+    function processDownload(href, filename) {
+        if (!href) return false;
+        if (href.startsWith('blob:')) {
+            downloadBlob(href, filename);
+            return true;
+        } else if (href.startsWith('data:')) {
+            if (window.AndroidBridge && typeof window.AndroidBridge.saveBase64File === 'function') {
+                window.AndroidBridge.saveBase64File(href, filename || 'descarga', '');
+                return true;
+            }
+        } else if (href.startsWith('http://') || href.startsWith('https://')) {
+            if (window.AndroidBridge && typeof window.AndroidBridge.downloadHttpFile === 'function') {
+                window.AndroidBridge.downloadHttpFile(href, filename || '', '');
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // 1. Hook HTMLAnchorElement.prototype.click (Catches FileSaver.js, dynamic downloads, and libraries)
+    var origClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function() {
+        var href = this.href || '';
+        var downloadAttr = this.getAttribute('download');
+        var isDownload = downloadAttr !== null || href.startsWith('blob:') || href.startsWith('data:');
+        if (isDownload) {
+            var handled = processDownload(href, downloadAttr || '');
+            if (handled) return;
+        }
+        return origClick.apply(this, arguments);
+    };
+
+    // 2. Intercept document-level click on any link or download button
     document.addEventListener('click', function(e) {
         var el = e.target.closest('a[download], a[href^="blob:"], a[href^="data:"]');
         if (el && el.href) {
-            var filename = el.getAttribute('download') || 'archivo';
-            if (el.href.startsWith('blob:')) {
+            var filename = el.getAttribute('download') || '';
+            var handled = processDownload(el.href, filename);
+            if (handled) {
                 e.preventDefault();
                 e.stopPropagation();
-                downloadBlob(el.href, filename);
-            } else if (el.href.startsWith('data:')) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (window.AndroidBridge && typeof window.AndroidBridge.saveBase64File === 'function') {
-                    window.AndroidBridge.saveBase64File(el.href, filename, '');
-                }
             }
         }
     }, true);

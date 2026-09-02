@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.MimeTypeMap
 import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebSettings
@@ -280,6 +281,7 @@ class MainActivity : AppCompatActivity() {
         binding.dashboardWebView.visibility = View.GONE
         binding.toolWebView.visibility = View.VISIBLE
         binding.floatingNavBarScroll.visibility = View.VISIBLE
+        binding.btnRestoreFloatingBar.visibility = View.GONE
         showToolLoader()
         binding.toolWebView.loadUrl(url)
     }
@@ -288,10 +290,39 @@ class MainActivity : AppCompatActivity() {
         binding.toolWebView.visibility = View.GONE
         binding.dashboardWebView.visibility = View.VISIBLE
         binding.floatingNavBarScroll.visibility = View.GONE
+        binding.btnRestoreFloatingBar.visibility = View.GONE
         binding.progressBar.visibility = View.GONE
         binding.toolLoadingOverlay.visibility = View.GONE
         // Descargar toolWebView a about:blank para liberar memoria y evitar que la sesión anterior persista
         binding.toolWebView.loadUrl("about:blank")
+    }
+
+    fun downloadDirect(url: String, suggestedFileName: String) {
+        runOnUiThread {
+            try {
+                val uri = Uri.parse(url)
+                val fileName = if (suggestedFileName.isNotBlank()) suggestedFileName else URLUtil.guessFileName(url, null, null)
+                val ext = MimeTypeMap.getFileExtensionFromUrl(url)
+                val mimeType = if (ext.isNotBlank()) MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.lowercase()) else null
+                val cookies = CookieManager.getInstance().getCookie(url) ?: ""
+                val ua = cleanMobileUserAgent
+
+                val request = DownloadManager.Request(uri).apply {
+                    if (mimeType != null) setMimeType(mimeType)
+                    if (ua.isNotBlank()) addRequestHeader("User-Agent", ua)
+                    if (cookies.isNotBlank()) addRequestHeader("Cookie", cookies)
+                    setDescription("Descargando archivo...")
+                    setTitle(fileName)
+                    setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                }
+                val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                dm.enqueue(request)
+                Toast.makeText(this, "Descargando en Descargas: $fileName", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, "Error al descargar: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun setupFloatingBar() {
@@ -309,6 +340,18 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnNavHome.setOnClickListener {
             showDashboard()
+        }
+
+        // Minimizar/Ocultar barra flotante para dejar pantalla completa
+        binding.btnNavMinimize.setOnClickListener {
+            binding.floatingNavBarScroll.visibility = View.GONE
+            binding.btnRestoreFloatingBar.visibility = View.VISIBLE
+        }
+
+        // Restaurar barra flotante al tocar el icono discreto
+        binding.btnRestoreFloatingBar.setOnClickListener {
+            binding.btnRestoreFloatingBar.visibility = View.GONE
+            binding.floatingNavBarScroll.visibility = View.VISIBLE
         }
 
         // 1. Inyectar Credenciales del Perfil (login_email, login_password, totpCode del perfil activo)

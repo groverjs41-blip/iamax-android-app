@@ -8,6 +8,7 @@ import android.view.View
 import android.webkit.SslErrorHandler
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.webkit.URLUtil
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ProgressBar
@@ -30,6 +31,12 @@ class IAmaxWebViewClient(
 
     private val turboCache = TurboCacheInterceptor(context)
 
+    private val downloadableExtensions = setOf(
+        "pdf", "zip", "rar", "7z", "tar", "gz", "csv", "xlsx", "xls",
+        "docx", "doc", "pptx", "ppt", "mp3", "mp4", "wav", "m4a", "webm",
+        "png", "jpg", "jpeg", "webp", "svg", "apk", "dmg", "exe", "json", "txt"
+    )
+
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
         // 1. Interceptar recursos locales del Dashboard
         val assetResponse = assetLoader.shouldInterceptRequest(request.url)
@@ -50,6 +57,24 @@ class IAmaxWebViewClient(
         val url = request.url.toString()
         val lower = url.lowercase()
         Log.d("IAmaxWebViewClient", "Loading URL: $url")
+
+        // Interceptar si es una descarga directa de archivo en Treblo, Nano Banana u otras herramientas
+        val path = request.url.path ?: ""
+        val lastDot = path.lastIndexOf('.')
+        val ext = if (lastDot != -1) path.substring(lastDot + 1).lowercase() else ""
+        val isDownloadExt = ext.isNotBlank() && downloadableExtensions.contains(ext)
+        val hasDownloadParam = lower.contains("download=true") || lower.contains("download=1") ||
+                               lower.contains("/download/") || lower.contains("/export/") ||
+                               lower.contains("export=true")
+
+        if (isDownloadExt || hasDownloadParam) {
+            val fileName = URLUtil.guessFileName(url, null, null)
+            (context as? MainActivity)?.let { mainAct ->
+                mainAct.downloadDirect(url, fileName)
+                return true
+            }
+        }
+
         if (lower.contains("accounts.google.") || lower.contains("google.com/signin") || lower.contains("google.com/servicelogin")) {
             val cleanUa = MainActivity.cleanMobileUserAgent
             if (cleanUa.isNotBlank() && view.settings.userAgentString != cleanUa) {

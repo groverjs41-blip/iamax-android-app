@@ -209,31 +209,11 @@ class CookieInjector {
      * Prevents Google accounts from persisting across different cards/profiles.
      */
     fun clearGoogleSession() {
-        val googleRoots = listOf(
-            "google.com",
-            "accounts.google.com",
-            "myaccount.google.com",
-            "gemini.google.com",
-            "googleusercontent.com",
-            "gstatic.com",
-            "googleapis.com",
-            "ggpht.com",
-            "youtube.com"
-        )
-        val googleAuthCookieNames = listOf(
-            "SID", "HSID", "SSID", "APISID", "SAPISID", "LSID", "OSID", "SIDCC",
-            "ACCOUNT_CHOOSER", "__Host-GAPS", "GAPS", "NID", "1P_JAR", "SEARCH_SAMESITE",
-            "CONSENT", "AEC", "SOCS", "OGPC", "SNID", "S", "LOGIN_INFO"
-        )
-        for (root in googleRoots) {
-            clearCookies(root)
-            val url = "https://$root/"
-            for (c in googleAuthCookieNames) {
-                cookieManager.setCookie(url, "$c=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0")
-                cookieManager.setCookie(url, "$c=; Domain=$root; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0")
-                cookieManager.setCookie(url, "$c=; Domain=.$root; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0")
-            }
+        try {
+            cookieManager.removeAllCookies(null)
+            cookieManager.flush()
+        } catch (e: Exception) {
+            Log.e("CookieInjector", "Error removing all cookies: ${e.message}", e)
         }
-        cookieManager.flush()
     }
 }
