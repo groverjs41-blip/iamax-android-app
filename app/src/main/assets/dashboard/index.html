@@ -9,10 +9,10 @@
     <link rel="stylesheet" href="./dashboard.css" />
     <script>
       window.addEventListener('error', function(e) {
-        alert("ERROR GLOBAL: " + e.message + " en " + e.filename + ":" + e.lineno);
+        console.error("ERROR GLOBAL: " + e.message + " en " + e.filename + ":" + e.lineno);
       });
       window.addEventListener('unhandledrejection', function(e) {
-        alert("ERROR ASYNC: " + (e.reason && e.reason.message ? e.reason.message : e.reason));
+        console.error("ERROR ASYNC: " + (e.reason && e.reason.message ? e.reason.message : e.reason));
       });
     </script>
   </head>

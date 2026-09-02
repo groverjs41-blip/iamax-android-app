@@ -193,83 +193,113 @@
     }
   };
 
-  // Storage shim: connects directly to Android SharedPreferences
-  const storageEngine = {
-    get: function(keys, callback) {
-      return new Promise(function(resolve) {
-        const result = {};
-        if (typeof keys === "string") {
-          const val = bridge ? bridge.getStoredItem(keys) : localStorage.getItem(keys);
-          if (val) {
-            try { result[keys] = JSON.parse(val); } catch(e) { result[keys] = val; }
-          }
-        } else if (Array.isArray(keys)) {
-          keys.forEach(function(k) {
-            const val = bridge ? bridge.getStoredItem(k) : localStorage.getItem(k);
-            if (val) {
-              try { result[k] = JSON.parse(val); } catch(e) { result[k] = val; }
-            }
-          });
-        } else if (keys === null || typeof keys === "undefined") {
-          const allResp = callBridge({ type: "GET_ALL_STORAGE" });
-          Object.assign(result, allResp.data || {});
-        } else if (typeof keys === "object") {
-          Object.keys(keys).forEach(function(k) {
-            const val = bridge ? bridge.getStoredItem(k) : localStorage.getItem(k);
-            if (val) {
-              try { result[k] = JSON.parse(val); } catch(e) { result[k] = val; }
-            } else {
-              result[k] = keys[k];
-            }
-          });
-        }
+  // Isolated storage engines: separate local and session stores
+  const memorySessionStore = {};
 
-        if (typeof callback === "function") callback(result);
-        resolve(result);
-      });
-    },
-    set: function(items, callback) {
-      return new Promise(function(resolve) {
-        if (items && typeof items === "object") {
-          Object.keys(items).forEach(function(k) {
-            const val = typeof items[k] === "string" ? items[k] : JSON.stringify(items[k]);
-            if (bridge) {
-              bridge.setStoredItem(k, val);
+  function createStorageEngine(isSessionOnly) {
+    return {
+      get: function(keys, callback) {
+        return new Promise(function(resolve) {
+          const result = {};
+
+          function getItem(k) {
+            if (isSessionOnly) {
+              if (k in memorySessionStore) return memorySessionStore[k];
+              // Fallback to bridge so persistent tokens survive app restarts
+              const val = bridge ? (bridge.getStoredItem("sess_" + k) || bridge.getStoredItem(k)) : null;
+              if (val) {
+                try { return JSON.parse(val); } catch(e) { return val; }
+              }
+              return undefined;
             } else {
-              localStorage.setItem(k, val);
+              const val = bridge ? bridge.getStoredItem(k) : localStorage.getItem(k);
+              if (val) {
+                try { return JSON.parse(val); } catch(e) { return val; }
+              }
+              return undefined;
+            }
+          }
+
+          if (typeof keys === "string") {
+            const val = getItem(keys);
+            if (val !== undefined) result[keys] = val;
+          } else if (Array.isArray(keys)) {
+            keys.forEach(function(k) {
+              const val = getItem(k);
+              if (val !== undefined) result[k] = val;
+            });
+          } else if (keys === null || typeof keys === "undefined") {
+            if (isSessionOnly) {
+              Object.assign(result, memorySessionStore);
+            } else {
+              const allResp = callBridge({ type: "GET_ALL_STORAGE" });
+              Object.assign(result, allResp.data || {});
+            }
+          } else if (typeof keys === "object") {
+            Object.keys(keys).forEach(function(k) {
+              const val = getItem(k);
+              result[k] = val !== undefined ? val : keys[k];
+            });
+          }
+
+          if (typeof callback === "function") callback(result);
+          resolve(result);
+        });
+      },
+      set: function(items, callback) {
+        return new Promise(function(resolve) {
+          if (items && typeof items === "object") {
+            Object.keys(items).forEach(function(k) {
+              const rawVal = items[k];
+              const strVal = typeof rawVal === "string" ? rawVal : JSON.stringify(rawVal);
+              if (isSessionOnly) {
+                memorySessionStore[k] = rawVal;
+                // Also backup in bridge with prefix so it survives app restarts
+                if (bridge) bridge.setStoredItem("sess_" + k, strVal);
+              } else {
+                if (bridge) bridge.setStoredItem(k, strVal);
+                else localStorage.setItem(k, strVal);
+              }
+            });
+          }
+          if (typeof callback === "function") callback();
+          resolve();
+        });
+      },
+      remove: function(keys, callback) {
+        return new Promise(function(resolve) {
+          const keyList = Array.isArray(keys) ? keys : [keys];
+          keyList.forEach(function(k) {
+            if (isSessionOnly) {
+              delete memorySessionStore[k];
+              if (bridge) bridge.removeStoredItem("sess_" + k);
+            } else {
+              if (bridge) bridge.removeStoredItem(k);
+              else localStorage.removeItem(k);
             }
           });
-        }
-        if (typeof callback === "function") callback();
-        resolve();
-      });
-    },
-    remove: function(keys, callback) {
-      return new Promise(function(resolve) {
-        const keyList = Array.isArray(keys) ? keys : [keys];
-        keyList.forEach(function(k) {
-          if (bridge) {
-            bridge.removeStoredItem(k);
-          } else {
-            localStorage.removeItem(k);
-          }
+          if (typeof callback === "function") callback();
+          resolve();
         });
-        if (typeof callback === "function") callback();
-        resolve();
-      });
-    },
-    clear: function(callback) {
-      return new Promise(function(resolve) {
-        if (typeof callback === "function") callback();
-        resolve();
-      });
-    }
-  };
+      },
+      clear: function(callback) {
+        return new Promise(function(resolve) {
+          if (isSessionOnly) {
+            Object.keys(memorySessionStore).forEach(function(k) { delete memorySessionStore[k]; });
+          } else {
+            if (bridge) callBridge({ type: "CLEAR_STORAGE" });
+          }
+          if (typeof callback === "function") callback();
+          resolve();
+        });
+      }
+    };
+  }
 
   window.chrome.storage = {
-    local: storageEngine,
-    session: storageEngine,
-    sync: storageEngine
+    local: createStorageEngine(false),
+    session: createStorageEngine(true),
+    sync: createStorageEngine(false)
   };
 
   window.chrome.tabs = {

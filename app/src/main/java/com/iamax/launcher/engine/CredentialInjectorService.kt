@@ -27,8 +27,16 @@ class CredentialInjectorService(
      */
     fun injectCredentials(webView: WebView) {
         val cardId = sessionStorage.getString("activeCardId", "")
-        val ownerToken = sessionStorage.getString("ownerToken", "")
-        val guestPassword = sessionStorage.getString("guestPassword", "")
+        val ownerToken = sessionStorage.getString("ownerToken", "").ifBlank {
+            sessionStorage.getString("sess_ownerToken", "").ifBlank {
+                sessionStorage.getString("session_ownerToken", "")
+            }
+        }
+        val guestPassword = sessionStorage.getString("guestPassword", "").ifBlank {
+            sessionStorage.getString("sess_guestPassword", "").ifBlank {
+                sessionStorage.getString("session_guestPassword", "")
+            }
+        }
 
         if (cardId.isBlank()) {
             Toast.makeText(context, "No hay perfil activo seleccionado", Toast.LENGTH_SHORT).show()
