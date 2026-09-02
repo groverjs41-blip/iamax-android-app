@@ -21,8 +21,6 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.webkit.WebSettingsCompat
-import androidx.webkit.WebViewFeature
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.iamax.launcher.bridge.IAmaxBridge
@@ -143,10 +141,6 @@ class MainActivity : AppCompatActivity() {
             .replace("(?i)version/[0-9.]+\\s*".toRegex(), "")
         cleanMobileUserAgent = cleanUa
         settings.userAgentString = cleanUa
-
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_CONTROL)) {
-            WebSettingsCompat.setRequestedWithHeaderOriginAllowList(settings, emptySet())
-        }
 
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
 
