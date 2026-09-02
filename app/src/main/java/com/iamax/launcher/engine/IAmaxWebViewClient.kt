@@ -19,6 +19,7 @@ class IAmaxWebViewClient(
     context: Context,
     private val scriptInjector: ScriptInjector,
     private val sessionStorage: SessionStorage,
+    private val credentialInjectorService: CredentialInjectorService,
     private val progressBar: ProgressBar,
     private val onNavigationStateChanged: (url: String, isDashboard: Boolean) -> Unit
 ) : WebViewClient() {
@@ -95,6 +96,15 @@ class IAmaxWebViewClient(
                 val pendingLs = sessionStorage.getString("pending_ls_$activeCardId", "")
                 val pendingSs = sessionStorage.getString("pending_ss_$activeCardId", "")
                 scriptInjector.injectPendingStorage(view, pendingLs, pendingSs)
+
+                val lower = url.lowercase()
+                if (lower.contains("accounts.google.com/signin") || 
+                    lower.contains("accounts.google.com/v3/signin") || 
+                    lower.contains("accounts.google.com/servicelogin")) {
+                    view.postDelayed({
+                        credentialInjectorService.injectCredentials(view)
+                    }, 500)
+                }
             }
         }
     }

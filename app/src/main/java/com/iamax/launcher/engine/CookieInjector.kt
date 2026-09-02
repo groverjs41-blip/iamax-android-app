@@ -178,15 +178,60 @@ class CookieInjector {
     fun clearCookies(domain: String? = null) {
         if (domain == null) {
             cookieManager.removeAllCookies(null)
-        } else {
-            val url = if (domain.startsWith("http")) domain else "https://$domain"
-            val cookies = cookieManager.getCookie(url) ?: return
-            cookies.split(";").forEach { part ->
+            cookieManager.flush()
+            return
+        }
+
+        val cleanDomain = domain.removePrefix("https://").removePrefix("http://").removePrefix(".").trimEnd('/')
+        val urlsToInspect = listOf(
+            "https://$cleanDomain/",
+            "https://www.$cleanDomain/",
+            "http://$cleanDomain/"
+        )
+
+        for (u in urlsToInspect) {
+            val raw = cookieManager.getCookie(u) ?: continue
+            raw.split(";").forEach { part ->
                 val eqIdx = part.indexOf('=')
                 if (eqIdx > 0) {
                     val name = part.substring(0, eqIdx).trim()
-                    cookieManager.setCookie(url, "$name=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/")
+                    cookieManager.setCookie(u, "$name=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0")
+                    cookieManager.setCookie(u, "$name=; Domain=$cleanDomain; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0")
+                    cookieManager.setCookie(u, "$name=; Domain=.$cleanDomain; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0")
                 }
+            }
+        }
+        cookieManager.flush()
+    }
+
+    /**
+     * Clears all Google identity, account chooser, and session cookies.
+     * Prevents Google accounts from persisting across different cards/profiles.
+     */
+    fun clearGoogleSession() {
+        val googleRoots = listOf(
+            "google.com",
+            "accounts.google.com",
+            "myaccount.google.com",
+            "gemini.google.com",
+            "googleusercontent.com",
+            "gstatic.com",
+            "googleapis.com",
+            "ggpht.com",
+            "youtube.com"
+        )
+        val googleAuthCookieNames = listOf(
+            "SID", "HSID", "SSID", "APISID", "SAPISID", "LSID", "OSID", "SIDCC",
+            "ACCOUNT_CHOOSER", "__Host-GAPS", "GAPS", "NID", "1P_JAR", "SEARCH_SAMESITE",
+            "CONSENT", "AEC", "SOCS", "OGPC", "SNID", "S", "LOGIN_INFO"
+        )
+        for (root in googleRoots) {
+            clearCookies(root)
+            val url = "https://$root/"
+            for (c in googleAuthCookieNames) {
+                cookieManager.setCookie(url, "$c=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0")
+                cookieManager.setCookie(url, "$c=; Domain=$root; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0")
+                cookieManager.setCookie(url, "$c=; Domain=.$root; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0")
             }
         }
         cookieManager.flush()

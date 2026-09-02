@@ -176,6 +176,7 @@ class MainActivity : AppCompatActivity() {
             context = this,
             scriptInjector = scriptInjector,
             sessionStorage = sessionStorage,
+            credentialInjectorService = credentialInjectorService,
             progressBar = binding.progressBar,
             onNavigationStateChanged = { _, _ -> }
         )
@@ -191,6 +192,7 @@ class MainActivity : AppCompatActivity() {
             context = this,
             scriptInjector = scriptInjector,
             sessionStorage = sessionStorage,
+            credentialInjectorService = credentialInjectorService,
             progressBar = binding.progressBar,
             onNavigationStateChanged = { _, isDashboard ->
                 binding.floatingNavBarScroll.visibility = if (isDashboard) View.GONE else View.VISIBLE

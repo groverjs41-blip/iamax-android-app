@@ -133,79 +133,120 @@ class CredentialInjectorService(
 
     private fun getAutoInjectorScript(email: String, pass: String, totp: String): String {
         return """
-            function querySelectorAllDeep(selector, root = document) {
-                let results = Array.from(root.querySelectorAll(selector));
-                const allElements = root.querySelectorAll('*');
-                for (const el of allElements) {
-                    if (el.shadowRoot) {
-                        results = results.concat(querySelectorAllDeep(selector, el.shadowRoot));
-                    }
-                }
-                return results;
-            }
+            (function() {
+                const injectedElements = new WeakSet();
 
-            const setNativeValue = (element, value) => {
-                if (!element || element.value === value) return;
-                try {
-                    const prototype = Object.getPrototypeOf(element);
-                    const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
-                    let valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-                    element.focus();
-                    if (valueSetter && prototypeValueSetter && valueSetter !== prototypeValueSetter) {
-                        prototypeValueSetter.call(element, value);
-                    } else if (valueSetter) {
-                        valueSetter.call(element, value);
-                    } else {
+                const setNativeValue = (element, value) => {
+                    if (!element) return;
+                    try {
+                        const prototype = Object.getPrototypeOf(element);
+                        const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
+                        const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+                        element.focus();
+                        if (valueSetter && prototypeValueSetter && valueSetter !== prototypeValueSetter) {
+                            prototypeValueSetter.call(element, value);
+                        } else if (valueSetter) {
+                            valueSetter.call(element, value);
+                        } else {
+                            element.value = value;
+                        }
+                        element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+                        element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+                        element.blur();
+                    } catch(e) {
                         element.value = value;
+                        element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
                     }
-                    element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                    element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                    element.blur();
-                } catch(e) {
-                    element.value = value;
-                    element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                }
-            };
+                };
 
-            const injectAll = () => {
-                const emailInputs = querySelectorAllDeep('input[type="email"], input[name="email" i], input[name="username" i], input[name="identifier" i], input[id="email" i], input[id="username" i], input[id="identifierId"], input[autocomplete="username"], input[autocomplete="email"]');
-                emailInputs.forEach(i => {
-                    const visible = !!(i.offsetWidth || i.offsetHeight || i.getClientRects().length);
-                    if (visible && i.type !== 'hidden' && !i.value) {
-                        try { i.style.setProperty('-webkit-text-security', 'disc', 'important'); } catch(e) {}
-                        setNativeValue(i, '$email');
-                    }
-                });
-
-                const passInputs = querySelectorAllDeep('input[type="password"], input[name="password" i], input[name="passwd" i], input[id="password" i], input[id="passwd" i], input[autocomplete="current-password"], input[autocomplete="new-password"]');
-                passInputs.forEach(i => {
-                    const visible = !!(i.offsetWidth || i.offsetHeight || i.getClientRects().length);
-                    if (visible && i.type !== 'hidden' && !i.value) {
-                        setNativeValue(i, '$pass');
-                    }
-                });
-
-                if ('$totp') {
-                    const totpInputs = querySelectorAllDeep('input[type="tel"], input[inputmode="numeric"], input[name*="totp" i]:not([type="hidden"]), input[id*="totp" i]:not([type="hidden"]), input[name*="otp" i]:not([type="hidden"]), input[id*="otp" i]:not([type="hidden"]), input[name*="pin" i]:not([type="hidden"]), input[id*="pin" i]:not([type="hidden"]), input[id*="idv" i]:not([type="hidden"]), input[autocomplete="one-time-code"], input[aria-label*="código" i], input[aria-label*="codigo" i], input[aria-label*="code" i], input[placeholder*="código" i], input[placeholder*="codigo" i]');
-                    totpInputs.forEach(i => {
-                        if (i.type !== 'hidden' && i.value !== '$totp') {
-                            setNativeValue(i, '$totp');
-                            try {
-                                i.style.setProperty('-webkit-text-security', 'disc', 'important');
-                                i.style.setProperty('filter', 'blur(7px)', 'important');
-                            } catch(e) {}
+                const injectPasswords = () => {
+                    let injected = 0;
+                    const passInputs = document.querySelectorAll('input[type="password"], input[name*="pass"]:not([type="hidden"]), input[id*="pass"]:not([type="hidden"]), input[name="Passwd"], input[autocomplete="current-password"], input[autocomplete="new-password"]');
+                    passInputs.forEach(i => {
+                        if (i.type !== 'hidden' && !String(i.value || '') && !injectedElements.has(i)) {
+                            injectedElements.add(i);
+                            injected++;
+                            try { i.style.setProperty('-webkit-text-security', 'disc', 'important'); } catch(e) {}
+                            setTimeout(() => setNativeValue(i, '$pass'), 600);
                         }
                     });
-                }
-            };
+                    return injected;
+                };
 
-            injectAll();
-            let attempts = 0;
-            const interval = setInterval(() => {
-                attempts++;
-                injectAll();
-                if (attempts >= 8) clearInterval(interval);
-            }, 1000);
+                const injectTOTP = () => {
+                    if (!'$totp') return 0;
+                    let injected = 0;
+                    const totpInputs = document.querySelectorAll('input[type="tel"], input[inputmode="numeric"], input[name*="totp" i]:not([type="hidden"]), input[id*="totp" i]:not([type="hidden"]), input[name*="pin" i]:not([type="hidden"]), input[id*="pin" i]:not([type="hidden"]), input[id*="idv" i]:not([type="hidden"]), input[autocomplete="one-time-code"], input[aria-label*="código" i], input[aria-label*="codigo" i], input[aria-label*="code" i], input[placeholder*="código" i], input[placeholder*="codigo" i]');
+                    totpInputs.forEach(i => {
+                        if (i.type !== 'hidden' && !String(i.value || '') && !injectedElements.has(i)) {
+                            injectedElements.add(i);
+                            injected++;
+                            try { i.style.setProperty('-webkit-text-security', 'disc', 'important'); } catch(e) {}
+                            setTimeout(() => setNativeValue(i, '$totp'), 700);
+                        }
+                    });
+                    return injected;
+                };
+
+                const injectEmail = () => {
+                    let injected = 0;
+                    const emailInputs = document.querySelectorAll('input[type="email"], input[name*="user"]:not([type="hidden"]), input[name*="email"]:not([type="hidden"]), input[id*="user"]:not([type="hidden"]), input[id*="email"]:not([type="hidden"]), input[name="identifier"], input[id="identifierId"], input[autocomplete="username"], input[autocomplete="email"]');
+                    emailInputs.forEach(i => {
+                        if (i.type !== 'hidden' && !String(i.value || '') && !injectedElements.has(i)) {
+                            injectedElements.add(i);
+                            injected++;
+                            try { i.style.setProperty('-webkit-text-security', 'disc', 'important'); } catch(e) {}
+                            setTimeout(() => setNativeValue(i, '$email'), 400);
+                        }
+                    });
+
+                    if (injected === 0) {
+                        const textInputs = document.querySelectorAll('input[type="text"], input:not([type])');
+                        textInputs.forEach(i => {
+                            const rect = i.getBoundingClientRect();
+                            if (rect.width > 0 && rect.height > 0 && !String(i.value || '').trim() && !injectedElements.has(i)) {
+                                injectedElements.add(i);
+                                injected++;
+                                try { i.style.setProperty('-webkit-text-security', 'disc', 'important'); } catch(e) {}
+                                setTimeout(() => setNativeValue(i, '$email'), 400);
+                            }
+                        });
+                    }
+
+                    return injected;
+                };
+
+                let injectedEmail = injectEmail();
+                let injectedPass = injectPasswords();
+                let injectedTotp = injectTOTP();
+
+                let observer = null;
+                if (injectedEmail === 0 || injectedPass === 0 || ('$totp' && injectedTotp === 0)) {
+                    observer = new MutationObserver(() => {
+                        const e = injectEmail();
+                        const p = injectPasswords();
+                        const t = injectTOTP();
+                        if (p > 0 || t > 0 || e > 0) {
+                            setTimeout(() => {
+                                if (observer) {
+                                    observer.disconnect();
+                                    observer = null;
+                                }
+                            }, 1000);
+                        }
+                    });
+                    const targetNode = document.body || document.documentElement;
+                    if (targetNode) {
+                        observer.observe(targetNode, { childList: true, subtree: true });
+                    }
+                    setTimeout(() => {
+                        if (observer) {
+                            observer.disconnect();
+                            observer = null;
+                        }
+                    }, 30000);
+                }
+            })();
         """.trimIndent()
     }
 }

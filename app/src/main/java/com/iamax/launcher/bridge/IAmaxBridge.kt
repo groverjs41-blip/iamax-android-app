@@ -4,6 +4,7 @@ import android.app.Activity
 import android.net.Uri
 import android.util.Log
 import android.webkit.JavascriptInterface
+import android.webkit.WebStorage
 import android.webkit.WebView
 import com.google.gson.Gson
 import com.google.gson.JsonObject
@@ -78,6 +79,35 @@ class IAmaxBridge(
         }
     }
 
+    private fun clearGoogleSessionState(targetUrl: String, loginMethod: String?) {
+        val lowerUrl = targetUrl.lowercase()
+        val isGoogle = (loginMethod != null && loginMethod.equals("google", ignoreCase = true)) ||
+                       lowerUrl.contains("accounts.google.") ||
+                       lowerUrl.contains("google.com") ||
+                       lowerUrl.contains("google.") ||
+                       lowerUrl.contains("youtube.com") ||
+                       lowerUrl.contains("gemini.google") ||
+                       lowerUrl.contains("nanobanana")
+
+        if (isGoogle) {
+            Log.d("IAmaxBridge", "Isolating Google profile: clearing previous Google account cookies & storage")
+            cookieInjector.clearGoogleSession()
+            activity.runOnUiThread {
+                try {
+                    val ws = WebStorage.getInstance()
+                    ws.deleteOrigin("https://accounts.google.com")
+                    ws.deleteOrigin("https://google.com")
+                    ws.deleteOrigin("https://www.google.com")
+                    ws.deleteOrigin("https://myaccount.google.com")
+                    ws.deleteOrigin("https://gemini.google.com")
+                    ws.deleteOrigin("https://youtube.com")
+                } catch (e: Exception) {
+                    Log.w("IAmaxBridge", "Error deleting Google web storage: ${e.message}")
+                }
+            }
+        }
+    }
+
     @JavascriptInterface
     fun handleMessage(jsonMessage: String): String {
         return try {
@@ -92,9 +122,11 @@ class IAmaxBridge(
                     val targetUrl = message.get("url")?.asString ?: message.get("targetUrl")?.asString ?: ""
                     val cardId = message.get("cardId")?.asString ?: ""
                     val userAgent = message.get("userAgent")?.asString ?: ""
+                    val loginMethod = message.get("loginMethod")?.asString ?: message.get("clientInjectMethod")?.asString ?: ""
                     if (cardId.isNotBlank()) {
                         sessionStorage.setString("activeCardId", cardId)
                     }
+                    clearGoogleSessionState(targetUrl, loginMethod)
 
                     var cookiesJson = ""
                     var lsJson = ""
@@ -199,9 +231,11 @@ class IAmaxBridge(
                     val targetUrl = message.get("url")?.asString ?: message.get("targetUrl")?.asString ?: ""
                     val cardId = message.get("cardId")?.asString ?: ""
                     val userAgent = message.get("userAgent")?.asString ?: ""
+                    val loginMethod = message.get("loginMethod")?.asString ?: message.get("clientInjectMethod")?.asString ?: ""
                     if (cardId.isNotBlank()) {
                         sessionStorage.setString("activeCardId", cardId)
                     }
+                    clearGoogleSessionState(targetUrl, loginMethod)
 
                     val dontClear = message.get("dontClearCookies")?.asBoolean ?: false
                     if (!dontClear && targetUrl.isNotBlank()) {
@@ -226,9 +260,11 @@ class IAmaxBridge(
                     val targetUrl = message.get("url")?.asString ?: ""
                     val cardId = message.get("cardId")?.asString ?: ""
                     val userAgent = message.get("userAgent")?.asString ?: ""
+                    val loginMethod = message.get("loginMethod")?.asString ?: message.get("clientInjectMethod")?.asString ?: ""
                     if (cardId.isNotBlank()) {
                         sessionStorage.setString("activeCardId", cardId)
                     }
+                    clearGoogleSessionState(targetUrl, loginMethod)
 
                     response.addProperty("success", true)
 
@@ -242,6 +278,10 @@ class IAmaxBridge(
                 }
 
                 "AUTO_INJECT_NOW", "INJECT_CREDENTIALS" -> {
+                    val reqCardId = message.get("cardId")?.asString ?: ""
+                    if (reqCardId.isNotBlank()) {
+                        sessionStorage.setString("activeCardId", reqCardId)
+                    }
                     activity.runOnUiThread {
                         val toolView = toolWebViewProvider()
                         credentialInjectorService.injectCredentials(toolView)
