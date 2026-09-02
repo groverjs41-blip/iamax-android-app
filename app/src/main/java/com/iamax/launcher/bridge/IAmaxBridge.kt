@@ -6,7 +6,6 @@ import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import com.google.gson.Gson
-import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.iamax.launcher.engine.CookieInjector
 import com.iamax.launcher.engine.CredentialInjectorService
@@ -27,6 +26,7 @@ class IAmaxBridge(
     private val credentialInjectorService: CredentialInjectorService,
     private val webViewProvider: () -> WebView,
     private val toolWebViewProvider: () -> WebView,
+    private val onApplyUserAgent: (userAgent: String) -> Unit = {},
     private val onNavigateToUrl: (url: String) -> Unit,
     private val onReturnToDashboard: () -> Unit
 ) {
@@ -41,6 +41,8 @@ class IAmaxBridge(
         .followSslRedirects(true)
         .build()
 
+    private val defaultDesktopUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+
     @JavascriptInterface
     fun handleMessage(jsonMessage: String): String {
         return try {
@@ -54,27 +56,105 @@ class IAmaxBridge(
                 "INJECT_SESSION" -> {
                     val targetUrl = message.get("url")?.asString ?: message.get("targetUrl")?.asString ?: ""
                     val cardId = message.get("cardId")?.asString ?: ""
+                    val userAgent = message.get("userAgent")?.asString ?: ""
                     if (cardId.isNotBlank()) {
                         sessionStorage.setString("activeCardId", cardId)
                     }
 
                     var cookiesJson = ""
+                    var lsJson = ""
+                    var ssJson = ""
+                    var cookieCount = 0
+
                     if (message.has("sessionData") && !message.get("sessionData").isJsonNull) {
-                        cookiesJson = gson.toJson(message.get("sessionData"))
+                        val sd = message.get("sessionData")
+                        if (sd.isJsonObject) {
+                            val obj = sd.asJsonObject
+                            if (obj.has("cookies_json")) cookiesJson = obj.get("cookies_json").asString
+                            if (obj.has("local_storage_json")) lsJson = obj.get("local_storage_json").asString
+                            if (obj.has("session_storage_json")) ssJson = obj.get("session_storage_json").asString
+                        } else {
+                            cookiesJson = gson.toJson(sd)
+                        }
                     } else if (message.has("session") && !message.get("session").isJsonNull) {
                         cookiesJson = gson.toJson(message.get("session"))
                     } else if (message.has("cookies") && !message.get("cookies").isJsonNull) {
                         cookiesJson = gson.toJson(message.get("cookies"))
                     }
 
+                    // En IAmax 1.3.9 el dashboard envía sessionData: null y fetchSession: true
+                    // Descargamos la sesión completa (cookies + localStorage + sessionStorage) directamente del servidor
+                    if (cookiesJson.isBlank() && cardId.isNotBlank()) {
+                        val ownerToken = sessionStorage.getString("ownerToken", "").ifBlank {
+                            sessionStorage.getString("sess_ownerToken", "").ifBlank {
+                                sessionStorage.getString("session_ownerToken", "")
+                            }
+                        }
+                        val guestPassword = sessionStorage.getString("guestPassword", "").ifBlank {
+                            sessionStorage.getString("sess_guestPassword", "").ifBlank {
+                                sessionStorage.getString("session_guestPassword", "")
+                            }
+                        }
+
+                        try {
+                            Log.d("IAmaxBridge", "Fetching session for cardId: $cardId from server...")
+                            val reqBuilder = Request.Builder()
+                                .url("https://iamaxbotcrm.online/api/sessions/download/$cardId")
+                            if (ownerToken.isNotBlank()) {
+                                reqBuilder.header("Authorization", "Bearer $ownerToken")
+                            }
+                            if (guestPassword.isNotBlank()) {
+                                reqBuilder.header("X-Guest-Password", guestPassword)
+                            }
+                            val callResp = httpClient.newCall(reqBuilder.build()).execute()
+                            if (callResp.isSuccessful) {
+                                val bodyStr = callResp.body?.string() ?: ""
+                                val sessObj = gson.fromJson(bodyStr, JsonObject::class.java)
+                                if (sessObj != null) {
+                                    if (sessObj.has("cookies_json")) {
+                                        val cj = sessObj.get("cookies_json")
+                                        cookiesJson = if (cj.isJsonPrimitive) cj.asString else gson.toJson(cj)
+                                    } else if (sessObj.has("cookies")) {
+                                        cookiesJson = gson.toJson(sessObj.get("cookies"))
+                                    }
+                                    if (sessObj.has("local_storage_json")) {
+                                        val lj = sessObj.get("local_storage_json")
+                                        lsJson = if (lj.isJsonPrimitive) lj.asString else gson.toJson(lj)
+                                    }
+                                    if (sessObj.has("session_storage_json")) {
+                                        val sj = sessObj.get("session_storage_json")
+                                        ssJson = if (sj.isJsonPrimitive) sj.asString else gson.toJson(sj)
+                                    }
+                                    Log.d("IAmaxBridge", "Downloaded session successfully for $cardId")
+                                }
+                            } else {
+                                Log.w("IAmaxBridge", "Failed to download session: HTTP ${callResp.code}")
+                            }
+                        } catch (e: Exception) {
+                            Log.e("IAmaxBridge", "Exception downloading session for $cardId: ${e.message}", e)
+                        }
+                    }
+
                     if (cookiesJson.isNotBlank()) {
-                        cookieInjector.injectCookies(cookiesJson, targetUrl)
+                        cookieCount = cookieInjector.injectCookiesCount(cookiesJson, targetUrl)
+                    }
+
+                    if (lsJson.isNotBlank()) {
+                        sessionStorage.setString("pending_ls_$cardId", lsJson)
+                    }
+                    if (ssJson.isNotBlank()) {
+                        sessionStorage.setString("pending_ss_$cardId", ssJson)
                     }
 
                     response.addProperty("success", true)
+                    response.addProperty("sessionRestored", true)
+                    response.addProperty("sessionVerified", true)
+                    response.addProperty("cookieCount", cookieCount)
 
                     if (targetUrl.isNotBlank() && targetUrl.startsWith("http")) {
                         activity.runOnUiThread {
+                            val finalUa = if (userAgent.isNotBlank()) userAgent else defaultDesktopUserAgent
+                            onApplyUserAgent(finalUa)
                             onNavigateToUrl(targetUrl)
                         }
                     }
@@ -83,6 +163,7 @@ class IAmaxBridge(
                 "CLEAR_AND_OPEN" -> {
                     val targetUrl = message.get("url")?.asString ?: message.get("targetUrl")?.asString ?: ""
                     val cardId = message.get("cardId")?.asString ?: ""
+                    val userAgent = message.get("userAgent")?.asString ?: ""
                     if (cardId.isNotBlank()) {
                         sessionStorage.setString("activeCardId", cardId)
                     }
@@ -99,6 +180,8 @@ class IAmaxBridge(
 
                     if (targetUrl.isNotBlank() && targetUrl.startsWith("http")) {
                         activity.runOnUiThread {
+                            val finalUa = if (userAgent.isNotBlank()) userAgent else defaultDesktopUserAgent
+                            onApplyUserAgent(finalUa)
                             onNavigateToUrl(targetUrl)
                         }
                     }
@@ -107,234 +190,90 @@ class IAmaxBridge(
                 "OPEN_TOOL_WINDOW", "OPEN_TOOL" -> {
                     val targetUrl = message.get("url")?.asString ?: ""
                     val cardId = message.get("cardId")?.asString ?: ""
+                    val userAgent = message.get("userAgent")?.asString ?: ""
                     if (cardId.isNotBlank()) {
                         sessionStorage.setString("activeCardId", cardId)
                     }
+
+                    response.addProperty("success", true)
 
                     if (targetUrl.isNotBlank() && targetUrl.startsWith("http")) {
                         activity.runOnUiThread {
+                            val finalUa = if (userAgent.isNotBlank()) userAgent else defaultDesktopUserAgent
+                            onApplyUserAgent(finalUa)
                             onNavigateToUrl(targetUrl)
                         }
                     }
-                    response.addProperty("success", true)
                 }
 
-                "INJECT_CREDENTIALS" -> {
-                    val cardId = message.get("cardId")?.asString ?: ""
-                    if (cardId.isNotBlank()) {
-                        sessionStorage.setString("activeCardId", cardId)
-                    }
-                    val email = message.get("email")?.asString ?: ""
-                    val password = message.get("password")?.asString ?: ""
-                    val totp = message.get("totpCode")?.asString ?: ""
-
-                    if (cardId.isNotBlank()) {
-                        sessionStorage.setString("pending_inject_email_$cardId", email)
-                        sessionStorage.setString("pending_inject_pass_$cardId", password)
-                        sessionStorage.setString("pending_inject_totp_$cardId", totp)
-                    }
-
+                "AUTO_INJECT_NOW", "INJECT_CREDENTIALS" -> {
                     activity.runOnUiThread {
-                        credentialInjectorService.injectCredentials(toolWebViewProvider())
-                    }
-
-                    response.addProperty("success", true)
-                    response.addProperty("message", "Inyectando credenciales del perfil...")
-                }
-
-                "AUTO_INJECT_NOW" -> {
-                    val cardId = message.get("cardId")?.asString ?: ""
-                    if (cardId.isNotBlank()) {
-                        sessionStorage.setString("activeCardId", cardId)
-                    }
-                    activity.runOnUiThread {
-                        credentialInjectorService.injectCredentials(toolWebViewProvider())
+                        val toolView = toolWebViewProvider()
+                        credentialInjectorService.injectCredentials(toolView)
                     }
                     response.addProperty("success", true)
                 }
 
-                "SET_PROFILE_MODULES" -> {
-                    val modules = message.get("modules") ?: JsonArray()
-                    response.addProperty("success", true)
-                    response.add("modules", modules)
-                }
-
-                "GET_PROFILE_MODULES" -> {
-                    val modules = JsonArray().apply {
-                        add("core")
-                        add("session")
-                        add("injector")
-                        add("shield")
-                        add("clear-cache")
-                    }
-                    response.addProperty("success", true)
-                    response.add("modules", modules)
-                }
-
-                "GET_PENDING_INJECT_STATE" -> {
-                    val activeId = sessionStorage.getString("activeCardId", "")
-                    response.addProperty("success", true)
-                    response.addProperty("isOwner", false)
-                    response.addProperty("clientCanInject", true)
-                    response.addProperty("clientInjectMethod", "google")
-                    response.addProperty("pendingInjectCardId", activeId)
-                }
-
-                "SET_BLOCKED_SELECTORS", "REVOKE_ACCESS_STATE", "RELOAD_INCOGNITO" -> {
-                    response.addProperty("success", true)
-                }
-
-                "EXTRACT_SESSION" -> {
-                    val url = message.get("url")?.asString ?: message.get("domain")?.asString ?: ""
-                    val target = if (url.startsWith("http")) url else "https://$url"
-                    val cookiesJson = cookieInjector.extractCookies(target)
-                    response.addProperty("success", true)
-                    response.add("cookies", gson.fromJson(cookiesJson, JsonArray::class.java))
-                }
-
-                "CLEAR_DOMAIN_CACHE", "CLEAR_DOMAIN_CACHE_NO_COOKIES" -> {
-                    val urlOrDomain = message.get("url")?.asString ?: message.get("domain")?.asString ?: ""
-                    val domain = if (urlOrDomain.startsWith("http")) {
-                        Uri.parse(urlOrDomain).host
-                    } else {
-                        urlOrDomain
-                    }
-                    cookieInjector.clearCookies(domain)
-                    response.addProperty("success", true)
-                }
-
-                "NAVIGATE_DASHBOARD" -> {
-                    activity.runOnUiThread {
-                        onReturnToDashboard()
-                    }
-                    response.addProperty("success", true)
-                }
-
-                "GET_STORAGE" -> {
+                "GET_STORED_ITEM" -> {
                     val key = message.get("key")?.asString ?: ""
                     val value = sessionStorage.getString(key, "")
-                    response.addProperty("key", key)
                     response.addProperty("value", value)
-                    response.addProperty("success", true)
                 }
 
-                "SET_STORAGE" -> {
+                "SET_STORED_ITEM" -> {
                     val key = message.get("key")?.asString ?: ""
                     val value = message.get("value")?.asString ?: ""
                     sessionStorage.setString(key, value)
                     response.addProperty("success", true)
                 }
 
-                "REMOVE_STORAGE" -> {
+                "REMOVE_STORED_ITEM" -> {
                     val key = message.get("key")?.asString ?: ""
                     sessionStorage.remove(key)
                     response.addProperty("success", true)
                 }
 
+                "CLEAR_STORAGE" -> {
+                    sessionStorage.clear()
+                    response.addProperty("success", true)
+                }
+
                 "GET_ALL_STORAGE" -> {
                     val all = sessionStorage.getAll()
-                    response.add("data", gson.toJsonTree(all))
+                    val dataObj = JsonObject()
+                    all.forEach { (k, v) ->
+                        dataObj.addProperty(k, v.toString())
+                    }
+                    response.add("data", dataObj)
+                }
+
+                "CLOSE_WINDOW", "RETURN_TO_DASHBOARD" -> {
+                    activity.runOnUiThread {
+                        onReturnToDashboard()
+                    }
                     response.addProperty("success", true)
                 }
 
                 else -> {
+                    Log.w("IAmaxBridge", "Unhandled message type: $type")
+                    response.addProperty("warning", "Unhandled message type: $type")
                     response.addProperty("success", true)
-                    response.addProperty("message", "Processed $type")
                 }
             }
 
             gson.toJson(response)
         } catch (e: Exception) {
-            Log.e("IAmaxBridge", "Error in handleMessage: ${e.message}", e)
-            val err = JsonObject()
-            err.addProperty("success", false)
-            err.addProperty("error", e.message)
-            gson.toJson(err)
-        }
-    }
-
-    /**
-     * High Performance Native HTTP Fetch using OkHttpClient (Handles TLS 1.3, HTTP/2, GZIP auto-decompression, Zero-CORS)
-     */
-    @JavascriptInterface
-    fun nativeFetch(urlStr: String, method: String, headersJson: String, body: String, callbackName: String) {
-        ioScope.launch {
-            var status = 0
-            var statusText = ""
-            var responseBody = ""
-            val responseHeaders = mutableMapOf<String, String>()
-
-            try {
-                val reqBuilder = Request.Builder().url(urlStr)
-                val cleanMethod = method.trim().uppercase()
-
-                // Apply headers
-                if (headersJson.isNotBlank()) {
-                    try {
-                        val headersObj = gson.fromJson(headersJson, JsonObject::class.java)
-                        headersObj.keySet().forEach { key ->
-                            val elem = headersObj.get(key)
-                            val value = if (elem.isJsonPrimitive) elem.asString else elem.toString()
-                            if (key.isNotBlank() && value.isNotBlank()) {
-                                reqBuilder.header(key, value)
-                            }
-                        }
-                    } catch (_: Exception) {}
-                }
-
-                // Apply Request Body if needed
-                val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
-                when (cleanMethod) {
-                    "POST" -> reqBuilder.post(body.toRequestBody(mediaType))
-                    "PUT" -> reqBuilder.put(body.toRequestBody(mediaType))
-                    "PATCH" -> reqBuilder.patch(body.toRequestBody(mediaType))
-                    "DELETE" -> {
-                        if (body.isNotBlank()) reqBuilder.delete(body.toRequestBody(mediaType))
-                        else reqBuilder.delete()
-                    }
-                    "HEAD" -> reqBuilder.head()
-                    else -> reqBuilder.get()
-                }
-
-                val response = httpClient.newCall(reqBuilder.build()).execute()
-                status = response.code
-                statusText = response.message.ifBlank { if (status in 200..299) "OK" else "Error" }
-
-                response.headers.forEach { pair ->
-                    responseHeaders[pair.first.lowercase()] = pair.second
-                }
-
-                responseBody = response.body?.string() ?: ""
-
-            } catch (e: Exception) {
-                Log.e("IAmaxBridge", "nativeFetch error on $urlStr: ${e.message}", e)
-                status = 500
-                statusText = e.message ?: "Network Error"
-                responseBody = "{\"error\": \"${e.message}\"}"
-            }
-
-            val respObj = JsonObject().apply {
-                addProperty("status", status)
-                addProperty("statusText", statusText)
-                addProperty("body", responseBody)
-                add("headers", gson.toJsonTree(responseHeaders))
-            }
-            val safeJson = gson.toJson(respObj)
-
-            activity.runOnUiThread {
-                try {
-                    val js = "if (window['$callbackName']) { window['$callbackName']($safeJson); }"
-                    webViewProvider().evaluateJavascript(js, null)
-                } catch (e: Exception) {
-                    Log.e("IAmaxBridge", "Callback invocation error: ${e.message}")
-                }
-            }
+            Log.e("IAmaxBridge", "Error handling message: ${e.message}", e)
+            val errResponse = JsonObject()
+            errResponse.addProperty("error", e.message)
+            gson.toJson(errResponse)
         }
     }
 
     @JavascriptInterface
-    fun getStoredItem(key: String): String {
-        return sessionStorage.getString(key, "")
+    fun getStoredItem(key: String): String? {
+        val value = sessionStorage.getString(key, "")
+        return if (value.isBlank()) null else value
     }
 
     @JavascriptInterface
@@ -347,13 +286,73 @@ class IAmaxBridge(
         sessionStorage.remove(key)
     }
 
+    /**
+     * Executes an HTTP request with OkHttp (supporting HTTP/2, GZIP/deflate)
+     * bypassing WebView CORS restrictions.
+     */
     @JavascriptInterface
-    fun isAndroidApp(): Boolean {
-        return true
-    }
+    fun nativeFetch(url: String, optionsJson: String): String {
+        return try {
+            val options = try {
+                gson.fromJson(optionsJson, JsonObject::class.java)
+            } catch (_: Exception) {
+                JsonObject()
+            }
 
-    @JavascriptInterface
-    fun log(msg: String) {
-        Log.d("IAmaxJS", msg)
+            val method = options.get("method")?.asString?.uppercase() ?: "GET"
+            val headersObj = if (options.has("headers") && options.get("headers").isJsonObject) {
+                options.getAsJsonObject("headers")
+            } else {
+                JsonObject()
+            }
+
+            val requestBuilder = Request.Builder().url(url)
+
+            headersObj.keySet().forEach { key ->
+                val value = headersObj.get(key).asString
+                requestBuilder.header(key, value)
+            }
+
+            if (options.has("body") && !options.get("body").isJsonNull) {
+                val bodyContent = options.get("body").asString
+                val contentType = headersObj.get("Content-Type")?.asString
+                    ?: headersObj.get("content-type")?.asString
+                    ?: "application/json; charset=utf-8"
+                val mediaType = contentType.toMediaTypeOrNull()
+                val requestBody = bodyContent.toRequestBody(mediaType)
+                requestBuilder.method(method, requestBody)
+            } else if (method == "POST" || method == "PUT" || method == "PATCH") {
+                val emptyBody = "".toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
+                requestBuilder.method(method, emptyBody)
+            } else {
+                requestBuilder.method(method, null)
+            }
+
+            val response = httpClient.newCall(requestBuilder.build()).execute()
+            val responseBody = response.body?.string() ?: ""
+
+            val result = JsonObject()
+            result.addProperty("status", response.code)
+            result.addProperty("statusText", response.message)
+            result.addProperty("ok", response.isSuccessful)
+            result.addProperty("body", responseBody)
+
+            val respHeaders = JsonObject()
+            for (i in 0 until response.headers.size) {
+                respHeaders.addProperty(response.headers.name(i), response.headers.value(i))
+            }
+            result.add("headers", respHeaders)
+
+            gson.toJson(result)
+        } catch (e: Exception) {
+            Log.e("IAmaxBridge", "nativeFetch error for $url: ${e.message}", e)
+            val errorResult = JsonObject()
+            errorResult.addProperty("status", 0)
+            errorResult.addProperty("statusText", e.message ?: "Network Error")
+            errorResult.addProperty("ok", false)
+            errorResult.addProperty("body", "")
+            errorResult.addProperty("error", e.message)
+            gson.toJson(errorResult)
+        }
     }
 }

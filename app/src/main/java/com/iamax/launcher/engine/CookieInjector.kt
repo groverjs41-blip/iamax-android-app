@@ -20,15 +20,21 @@ class CookieInjector {
     /**
      * Injects a list of cookies into the Android CookieManager for a target domain/url.
      * Supports array of cookie objects, cookies_json string, sessionData object, or raw cookie strings.
+     * Returns the total count of cookies injected.
      */
     fun injectCookies(cookiesJson: String, targetUrl: String? = null): Boolean {
-        if (cookiesJson.isBlank()) return false
+        return injectCookiesCount(cookiesJson, targetUrl) > 0
+    }
+
+    fun injectCookiesCount(cookiesJson: String, targetUrl: String? = null): Int {
+        if (cookiesJson.isBlank()) return 0
+        var count = 0
 
         try {
             val jsonElement = gson.fromJson(cookiesJson, JsonElement::class.java)
 
             if (jsonElement.isJsonArray) {
-                injectJsonArray(jsonElement.asJsonArray, targetUrl)
+                count = injectJsonArray(jsonElement.asJsonArray, targetUrl)
             } else if (jsonElement.isJsonObject) {
                 val obj = jsonElement.asJsonObject
                 if (obj.has("cookies_json") && obj.get("cookies_json").isJsonPrimitive) {
@@ -36,46 +42,52 @@ class CookieInjector {
                     try {
                         val innerElement = gson.fromJson(innerJson, JsonElement::class.java)
                         if (innerElement.isJsonArray) {
-                            injectJsonArray(innerElement.asJsonArray, targetUrl)
+                            count = injectJsonArray(innerElement.asJsonArray, targetUrl)
                         }
                     } catch (_: Exception) {}
                 } else if (obj.has("cookies") && obj.get("cookies").isJsonArray) {
-                    injectJsonArray(obj.get("cookies").asJsonArray, targetUrl)
+                    count = injectJsonArray(obj.get("cookies").asJsonArray, targetUrl)
                 } else if (obj.has("name") && obj.has("value")) {
                     injectCookieObject(obj, targetUrl)
+                    count = 1
                 } else {
-                    // Inject key-values as cookies
                     obj.keySet().forEach { key ->
                         val value = obj.get(key)?.asString ?: ""
                         injectRawCookie("$key=$value", targetUrl)
+                        count++
                     }
                 }
             } else if (jsonElement.isJsonPrimitive && jsonElement.asJsonPrimitive.isString) {
                 val str = jsonElement.asString
                 if (str.startsWith("[") || str.startsWith("{")) {
-                    return injectCookies(str, targetUrl)
+                    return injectCookiesCount(str, targetUrl)
                 } else {
                     injectRawCookie(str, targetUrl)
+                    count = 1
                 }
             }
 
             cookieManager.flush()
-            Log.d("CookieInjector", "Cookies injected successfully for $targetUrl")
-            return true
+            Log.d("CookieInjector", "Injected $count cookies successfully for $targetUrl")
+            return count
         } catch (e: Exception) {
             Log.e("CookieInjector", "Error injecting cookies: ${e.message}", e)
-            return false
+            return 0
         }
     }
 
-    private fun injectJsonArray(array: JsonArray, targetUrl: String?) {
+    private fun injectJsonArray(array: JsonArray, targetUrl: String?): Int {
+        var c = 0
         for (item in array) {
             if (item.isJsonObject) {
                 injectCookieObject(item.asJsonObject, targetUrl)
+                c++
             } else if (item.isJsonPrimitive && item.asJsonPrimitive.isString) {
                 injectRawCookie(item.asString, targetUrl)
+                c++
             }
         }
+        return c
     }
 
     private fun injectCookieObject(cookie: JsonObject, fallbackUrl: String?) {
@@ -106,12 +118,23 @@ class CookieInjector {
         sb.append("; Path=$path")
         if (secure) sb.append("; Secure")
         if (httpOnly) sb.append("; HttpOnly")
+
         if (!sameSite.isNullOrBlank() && !sameSite.equals("no_restriction", ignoreCase = true) && !sameSite.equals("unspecified", ignoreCase = true)) {
-            sb.append("; SameSite=$sameSite")
+            val sSite = when (sameSite.lowercase()) {
+                "lax" -> "Lax"
+                "strict" -> "Strict"
+                "none" -> "None"
+                else -> sameSite
+            }
+            sb.append("; SameSite=$sSite")
         }
 
         val cookieStr = sb.toString()
         cookieManager.setCookie(targetUrl, cookieStr)
+        if (domainClean.isNotEmpty()) {
+            val rootUrl = "https://$domainClean/"
+            cookieManager.setCookie(rootUrl, cookieStr)
+        }
         if (!fallbackUrl.isNullOrBlank() && fallbackUrl != targetUrl) {
             cookieManager.setCookie(fallbackUrl, cookieStr)
         }

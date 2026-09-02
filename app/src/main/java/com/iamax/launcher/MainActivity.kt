@@ -93,6 +93,9 @@ class MainActivity : AppCompatActivity() {
             credentialInjectorService = credentialInjectorService,
             webViewProvider = { binding.dashboardWebView },
             toolWebViewProvider = { binding.toolWebView },
+            onApplyUserAgent = { ua ->
+                binding.toolWebView.settings.userAgentString = ua
+            },
             onNavigateToUrl = { url -> openToolUrl(url) },
             onReturnToDashboard = { showDashboard() }
         )
@@ -164,6 +167,7 @@ class MainActivity : AppCompatActivity() {
         webView.webViewClient = IAmaxWebViewClient(
             context = this,
             scriptInjector = scriptInjector,
+            sessionStorage = sessionStorage,
             progressBar = binding.progressBar,
             onNavigationStateChanged = { _, _ -> }
         )
@@ -174,10 +178,12 @@ class MainActivity : AppCompatActivity() {
     private fun setupToolWebView() {
         val webView = binding.toolWebView
         applyHighSpeedSettings(webView)
+        webView.settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
 
         webView.webViewClient = IAmaxWebViewClient(
             context = this,
             scriptInjector = scriptInjector,
+            sessionStorage = sessionStorage,
             progressBar = binding.progressBar,
             onNavigationStateChanged = { _, isDashboard ->
                 binding.floatingNavBarScroll.visibility = if (isDashboard) View.GONE else View.VISIBLE

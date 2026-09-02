@@ -12,10 +12,12 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ProgressBar
 import androidx.webkit.WebViewAssetLoader
+import com.iamax.launcher.storage.SessionStorage
 
 class IAmaxWebViewClient(
     context: Context,
     private val scriptInjector: ScriptInjector,
+    private val sessionStorage: SessionStorage,
     private val progressBar: ProgressBar,
     private val onNavigationStateChanged: (url: String, isDashboard: Boolean) -> Unit
 ) : WebViewClient() {
@@ -54,6 +56,15 @@ class IAmaxWebViewClient(
         val isDashboard = isDashboardUrl(url)
         onNavigationStateChanged(url, isDashboard)
         scriptInjector.onPageStarted(view, url)
+
+        if (!isDashboard) {
+            val activeCardId = sessionStorage.getString("activeCardId", "")
+            if (activeCardId.isNotBlank()) {
+                val pendingLs = sessionStorage.getString("pending_ls_$activeCardId", "")
+                val pendingSs = sessionStorage.getString("pending_ss_$activeCardId", "")
+                scriptInjector.injectPendingStorage(view, pendingLs, pendingSs)
+            }
+        }
     }
 
     override fun onPageFinished(view: WebView, url: String) {
@@ -62,6 +73,15 @@ class IAmaxWebViewClient(
         val isDashboard = isDashboardUrl(url)
         onNavigationStateChanged(url, isDashboard)
         scriptInjector.onPageFinished(view, url)
+
+        if (!isDashboard) {
+            val activeCardId = sessionStorage.getString("activeCardId", "")
+            if (activeCardId.isNotBlank()) {
+                val pendingLs = sessionStorage.getString("pending_ls_$activeCardId", "")
+                val pendingSs = sessionStorage.getString("pending_ss_$activeCardId", "")
+                scriptInjector.injectPendingStorage(view, pendingLs, pendingSs)
+            }
+        }
     }
 
     override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler?, error: SslError?) {

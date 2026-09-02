@@ -90,6 +90,36 @@ class ScriptInjector(private val context: Context) {
     }
 
     /**
+     * Injects pending localStorage and sessionStorage keys into the tool page.
+     */
+    fun injectPendingStorage(webView: WebView, lsJson: String?, ssJson: String?) {
+        if (lsJson.isNullOrBlank() && ssJson.isNullOrBlank()) return
+        val safeLs = (lsJson ?: "{}").replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "")
+        val safeSs = (ssJson ?: "{}").replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "")
+
+        val js = """
+            (function() {
+                try {
+                    var ls = JSON.parse('$safeLs');
+                    for (var k in ls) {
+                        if (k !== '_iamax_final_url') {
+                            localStorage.setItem(k, ls[k]);
+                        }
+                    }
+                } catch(e) {}
+                try {
+                    var ss = JSON.parse('$safeSs');
+                    for (var k in ss) {
+                        sessionStorage.setItem(k, ss[k]);
+                    }
+                } catch(e) {}
+            })();
+        """.trimIndent()
+
+        webView.evaluateJavascript(js, null)
+    }
+
+    /**
      * Injects scripts configured for document_start.
      */
     fun onPageStarted(webView: WebView, url: String) {
