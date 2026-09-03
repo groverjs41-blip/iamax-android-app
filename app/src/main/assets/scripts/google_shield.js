@@ -314,20 +314,21 @@ function ensureInjectButton() {
     btn.id = "iamax-inject-btn";
     btn.type = "button";
     btn.setAttribute("data-iamax-inject", "1");
-    btn.textContent = "INYECTAR IAMAX";
+    const isMobile = window.innerWidth <= 640 || 'ontouchstart' in window;
+    btn.textContent = isMobile ? "⚡ Inyectar" : "INYECTAR IAMAX";
     Object.assign(btn.style, {
         position: "fixed",
-        bottom: "24px",
-        right: "24px",
-        padding: "16px 24px",
+        bottom: isMobile ? "76px" : "24px",
+        right: isMobile ? "14px" : "24px",
+        padding: isMobile ? "10px 18px" : "16px 24px",
         backgroundColor: "#00E5FF",
         color: "#000",
         border: "none",
         borderRadius: "50px",
-        fontSize: "16px",
+        fontSize: isMobile ? "13px" : "16px",
         fontWeight: "bold",
         cursor: "pointer",
-        boxShadow: "0 8px 24px rgba(0, 229, 255, 0.4)",
+        boxShadow: isMobile ? "0 4px 16px rgba(0, 229, 255, 0.45)" : "0 8px 24px rgba(0, 229, 255, 0.4)",
         zIndex: "2147483647",
         transition: "transform 0.2s, background-color 0.2s"
     });

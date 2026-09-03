@@ -47,10 +47,11 @@
 
         const container = document.createElement("div");
         container.id = "iamax-inject-floating-container";
+        const isMobile = window.innerWidth <= 640 || 'ontouchstart' in window;
         container.style.cssText = `
             position: fixed !important;
-            bottom: 24px !important;
-            right: 20px !important;
+            bottom: ${isMobile ? '76px' : '24px'} !important;
+            right: ${isMobile ? '14px' : '20px'} !important;
             z-index: 2147483647 !important;
             display: flex !important;
             align-items: center !important;
@@ -63,12 +64,12 @@
         btn.setAttribute("data-iamax-inject", "1");
         btn.innerHTML = "⚡ Inyectar";
         btn.style.cssText = `
-            padding: 10px 18px !important;
+            padding: ${isMobile ? '8px 14px' : '10px 18px'} !important;
             background: linear-gradient(135deg, #6366F1, #4F46E5) !important;
             color: white !important;
             border: none !important;
             border-radius: 25px !important;
-            font-size: 14px !important;
+            font-size: ${isMobile ? '13px' : '14px'} !important;
             font-weight: bold !important;
             cursor: pointer !important;
             box-shadow: 0 4px 15px rgba(99, 102, 241, 0.5) !important;

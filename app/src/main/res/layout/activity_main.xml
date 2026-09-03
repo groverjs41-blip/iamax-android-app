@@ -108,16 +108,16 @@
                 android:elevation="8dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="8dp"
-                android:paddingTop="4dp"
-                android:paddingEnd="8dp"
-                android:paddingBottom="4dp">
+                android:paddingStart="6dp"
+                android:paddingTop="3dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="3dp">
 
                 <!-- Home -->
                 <ImageButton
                     android:id="@+id/btnNavHome"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@string/back_to_dashboard"
                     android:src="@drawable/ic_home"
@@ -126,8 +126,8 @@
                 <!-- Back -->
                 <ImageButton
                     android:id="@+id/btnNavBack"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@string/app_name"
                     android:src="@drawable/ic_arrow_back"
@@ -136,8 +136,8 @@
                 <!-- Refresh -->
                 <ImageButton
                     android:id="@+id/btnNavRefresh"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@string/reload_page"
                     android:src="@drawable/ic_refresh"
@@ -146,9 +146,9 @@
                 <!-- Divider -->
                 <View
                     android:layout_width="1dp"
-                    android:layout_height="22dp"
-                    android:layout_marginStart="4dp"
-                    android:layout_marginEnd="4dp"
+                    android:layout_height="20dp"
+                    android:layout_marginStart="3dp"
+                    android:layout_marginEnd="3dp"
                     android:background="#475569" />
 
                 <!-- Inject Credentials Button -->
@@ -161,19 +161,19 @@
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp">
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp">
 
                     <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
                         android:src="@drawable/ic_vpn_key"
                         app:tint="#38BDF8" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
+                        android:layout_marginStart="4dp"
                         android:fontFamily="sans-serif-medium"
                         android:text="Inyectar"
                         android:textColor="#F8FAFC"
@@ -185,25 +185,25 @@
                     android:id="@+id/btnNavClearCache"
                     android:layout_width="wrap_content"
                     android:layout_height="36dp"
-                    android:layout_marginStart="6dp"
+                    android:layout_marginStart="4dp"
                     android:background="@drawable/bg_chip_button"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp">
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp">
 
                     <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
                         android:src="@drawable/ic_cleaning_services"
                         app:tint="#F59E0B" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
+                        android:layout_marginStart="4dp"
                         android:fontFamily="sans-serif-medium"
                         android:text="Limpiar"
                         android:textColor="#F8FAFC"
@@ -215,27 +215,27 @@
                     android:id="@+id/btnNavCheckIp"
                     android:layout_width="wrap_content"
                     android:layout_height="36dp"
-                    android:layout_marginStart="6dp"
+                    android:layout_marginStart="4dp"
                     android:background="@drawable/bg_chip_button"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp">
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp">
 
                     <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
                         android:src="@drawable/ic_language"
                         app:tint="#10B981" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
+                        android:layout_marginStart="4dp"
                         android:fontFamily="sans-serif-medium"
-                        android:text="IP Proxy"
+                        android:text="IP"
                         android:textColor="#F8FAFC"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -243,9 +243,9 @@
                 <!-- Minimize / Hide Floating Bar Button -->
                 <ImageButton
                     android:id="@+id/btnNavMinimize"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:layout_marginStart="4dp"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_marginStart="3dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="Ocultar barra"
                     android:src="@drawable/ic_arrow_back"
