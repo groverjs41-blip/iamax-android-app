@@ -27,7 +27,8 @@ class ScriptInjector(private val context: Context) {
             "scripts/bot_autologin.js",
             "scripts/streaming_adblock.js",
             "scripts/auto_injector.js",
-            "scripts/credential_mask.js"
+            "scripts/credential_mask.js",
+            "scripts/blob_downloader.js"
         )
 
         for (path in scriptPaths) {
@@ -178,6 +179,10 @@ class ScriptInjector(private val context: Context) {
             url.startsWith("file:///android_asset/")) return
 
         val lowerUrl = url.lowercase()
+
+        // Re-inject blob_downloader on every page finish (SPAs like Gemini may destroy
+        // scripts injected at document_start when doing internal navigation)
+        injectJs(webView, "scripts/blob_downloader.js")
 
         if (lowerUrl.contains("gemini.google.com")) {
             injectJs(webView, "scripts/gemini_shield.js")

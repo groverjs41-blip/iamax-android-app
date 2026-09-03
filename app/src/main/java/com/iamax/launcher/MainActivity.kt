@@ -584,6 +584,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // Capturar valores de WebView en hilo principal ANTES de lanzar IO
+        val webViewUrl = binding.toolWebView.url ?: ""
+        val webViewUa = binding.toolWebView.settings.userAgentString ?: ""
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val initialName = if (suggestedName.isNotBlank()) suggestedName else URLUtil.guessFileName(url, null, null)
@@ -591,10 +595,10 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this@MainActivity, "Descargando: $initialName...", Toast.LENGTH_SHORT).show()
                 }
 
-                val currentWebUrl = referer ?: binding.toolWebView.url ?: ""
+                val currentWebUrl = referer ?: webViewUrl
                 val effectiveUa = when {
                     !customUserAgent.isNullOrBlank() -> customUserAgent
-                    binding.toolWebView.settings.userAgentString.isNotBlank() -> binding.toolWebView.settings.userAgentString
+                    webViewUa.isNotBlank() -> webViewUa
                     else -> cleanMobileUserAgent
                 }
 
