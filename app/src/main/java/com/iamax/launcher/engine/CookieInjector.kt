@@ -112,31 +112,28 @@ class CookieInjector {
             fallbackUrl ?: "https://localhost/"
         }
 
-        val sb = StringBuilder()
-        sb.append("$name=$value")
-        if (domain.isNotEmpty()) sb.append("; Domain=$domain")
-        sb.append("; Path=$path")
-        if (secure) sb.append("; Secure")
-        if (httpOnly) sb.append("; HttpOnly")
-
-        if (!sameSite.isNullOrBlank() && !sameSite.equals("no_restriction", ignoreCase = true) && !sameSite.equals("unspecified", ignoreCase = true)) {
-            val sSite = when (sameSite.lowercase()) {
+        val sSite = if (!sameSite.isNullOrBlank() && !sameSite.equals("no_restriction", ignoreCase = true) && !sameSite.equals("unspecified", ignoreCase = true)) {
+            when (sameSite.lowercase()) {
                 "lax" -> "Lax"
                 "strict" -> "Strict"
                 "none" -> "None"
                 else -> sameSite
             }
-            sb.append("; SameSite=$sSite")
-        }
+        } else null
+
+        val sb = StringBuilder()
+        sb.append("$name=$value")
+        if (domain.isNotEmpty()) sb.append("; Domain=$domain")
+        sb.append("; Path=$path")
+        if (secure || sSite?.equals("none", ignoreCase = true) == true) sb.append("; Secure")
+        if (httpOnly) sb.append("; HttpOnly")
+        if (sSite != null) sb.append("; SameSite=$sSite")
 
         val cookieStr = sb.toString()
         cookieManager.setCookie(targetUrl, cookieStr)
         if (domainClean.isNotEmpty()) {
             val rootUrl = "https://$domainClean/"
             cookieManager.setCookie(rootUrl, cookieStr)
-        }
-        if (!fallbackUrl.isNullOrBlank() && fallbackUrl != targetUrl) {
-            cookieManager.setCookie(fallbackUrl, cookieStr)
         }
     }
 
@@ -209,6 +206,10 @@ class CookieInjector {
      * Prevents Google accounts from persisting across different cards/profiles.
      */
     fun clearGoogleSession() {
+        clearAllCookies()
+    }
+
+    fun clearAllCookies() {
         try {
             cookieManager.removeAllCookies(null)
             cookieManager.flush()

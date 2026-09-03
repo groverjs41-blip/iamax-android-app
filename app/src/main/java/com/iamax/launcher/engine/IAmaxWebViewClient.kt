@@ -126,7 +126,11 @@ class IAmaxWebViewClient(
                 val lower = url.lowercase()
                 if (lower.contains("accounts.google.com/signin") || 
                     lower.contains("accounts.google.com/v3/signin") || 
-                    lower.contains("accounts.google.com/servicelogin")) {
+                    lower.contains("accounts.google.com/servicelogin") ||
+                    lower.contains("auth.openai.com") ||
+                    lower.contains("auth0.openai.com") ||
+                    lower.contains("chatgpt.com/auth") ||
+                    lower.contains("/login") || lower.contains("/signin")) {
                     view.postDelayed({
                         credentialInjectorService.injectCredentials(view)
                     }, 500)

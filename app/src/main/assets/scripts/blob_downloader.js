@@ -6,16 +6,19 @@
 
     function sendBase64(base64data, filename, mime) {
         if (!base64data || !window.AndroidBridge) return;
-        if (base64data.length > 400000 && typeof window.AndroidBridge.saveBase64Chunk === 'function') {
-            var chunkSize = 200000;
-            var total = Math.ceil(base64data.length / chunkSize);
+        var commaIdx = base64data.indexOf(',');
+        var cleanData = commaIdx !== -1 ? base64data.substring(commaIdx + 1) : base64data;
+
+        if (cleanData.length > 250000 && typeof window.AndroidBridge.saveBase64Chunk === 'function') {
+            var chunkSize = 150000;
+            var total = Math.ceil(cleanData.length / chunkSize);
             var tx = 'tx_' + Date.now();
             for (var i = 0; i < total; i++) {
-                var chunk = base64data.substring(i * chunkSize, (i + 1) * chunkSize);
+                var chunk = cleanData.substring(i * chunkSize, (i + 1) * chunkSize);
                 window.AndroidBridge.saveBase64Chunk(tx, i, total, chunk, filename || 'descarga', mime || '');
             }
         } else if (typeof window.AndroidBridge.saveBase64File === 'function') {
-            window.AndroidBridge.saveBase64File(base64data, filename || 'descarga', mime || '');
+            window.AndroidBridge.saveBase64File(cleanData, filename || 'descarga', mime || '');
         }
     }
 
@@ -78,7 +81,7 @@
         return origOpen.apply(this, arguments);
     };
 
-    // 3. Intercept user clicks on explicit download links
+    // 3. Intercept clicks on explicit download links and media buttons
     document.addEventListener('click', function(e) {
         var a = e.target.closest('a');
         if (a && a.href) {
@@ -93,6 +96,51 @@
                     e.preventDefault();
                     e.stopPropagation();
                 }
+            }
+        }
+    }, true);
+
+    // 4. Long press on Video or Audio (allows downloading Gemini videos and Treblo audio by holding down)
+    var touchTimer = null;
+    document.addEventListener('touchstart', function(e) {
+        var video = e.target.closest('video');
+        var audio = e.target.closest('audio');
+        var media = video || audio;
+        if (media) {
+            touchTimer = setTimeout(function() {
+                var src = media.currentSrc || media.src;
+                if (!src) {
+                    var source = media.querySelector('source');
+                    if (source) src = source.src;
+                }
+                if (src) {
+                    var ext = video ? '.mp4' : '.ogg';
+                    var name = (video ? 'gemini_video_' : 'treblo_audio_') + Date.now() + ext;
+                    processDownload(src, name);
+                }
+            }, 600);
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchend', function() {
+        if (touchTimer) clearTimeout(touchTimer);
+    }, { passive: true });
+    document.addEventListener('touchmove', function() {
+        if (touchTimer) clearTimeout(touchTimer);
+    }, { passive: true });
+
+    // 5. Context menu on Video
+    document.addEventListener('contextmenu', function(e) {
+        var video = e.target.closest('video');
+        if (video) {
+            var src = video.currentSrc || video.src;
+            if (!src) {
+                var source = video.querySelector('source');
+                if (source) src = source.src;
+            }
+            if (src) {
+                e.preventDefault();
+                processDownload(src, 'gemini_video_' + Date.now() + '.mp4');
             }
         }
     }, true);

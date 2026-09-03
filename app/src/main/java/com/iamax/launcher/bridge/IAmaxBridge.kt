@@ -97,27 +97,7 @@ class IAmaxBridge(
                        lowerUrl.contains("banana")
 
         try {
-            val uri = Uri.parse(targetUrl)
-            val host = uri.host ?: ""
-            val origin = if (uri.scheme != null && uri.host != null) "${uri.scheme}://${uri.host}" else ""
-
-            if (host.isNotBlank()) {
-                cookieInjector.clearCookies(host)
-                cookieInjector.clearCookies(".$host")
-                val parts = host.split(".")
-                if (parts.size >= 2) {
-                    val root = "${parts[parts.size - 2]}.${parts[parts.size - 1]}"
-                    if (root != host) {
-                        cookieInjector.clearCookies(root)
-                        cookieInjector.clearCookies(".$root")
-                    }
-                }
-            }
-
-            if (isGoogle) {
-                Log.d("IAmaxBridge", "Isolating Google profile: clearing all cookies & storage")
-                cookieInjector.clearGoogleSession()
-            }
+            cookieInjector.clearAllCookies()
 
             activity.runOnUiThread {
                 try {
@@ -171,10 +151,9 @@ class IAmaxBridge(
                     if (cardId.isNotBlank()) {
                         sessionStorage.setString("activeCardId", cardId)
                     }
-                    val lowerUrl = targetUrl.lowercase()
-                    if (loginMethod.equals("google", ignoreCase = true) || lowerUrl.contains("accounts.google.") || lowerUrl.contains("banana")) {
-                        clearToolStorageAndSession(targetUrl, loginMethod)
-                    }
+
+                    // Aislamiento completo: cada perfil (ChatGPT 1, 2, 3, Google, etc.) debe tener su propia sesión limpia
+                    clearToolStorageAndSession(targetUrl, loginMethod)
 
                     var cookiesJson = ""
                     var lsJson = ""
@@ -420,20 +399,21 @@ class IAmaxBridge(
         }
     }
 
-    private val chunkMap = java.util.concurrent.ConcurrentHashMap<String, java.io.ByteArrayOutputStream>()
+    private val chunkMap = java.util.concurrent.ConcurrentHashMap<String, java.lang.StringBuilder>()
 
     @JavascriptInterface
     fun saveBase64Chunk(transferId: String, index: Int, total: Int, chunk: String, fileName: String, mimeType: String) {
         try {
-            val stream = chunkMap.getOrPut(transferId) { java.io.ByteArrayOutputStream() }
+            val sb = chunkMap.getOrPut(transferId) { java.lang.StringBuilder() }
             val commaIdx = chunk.indexOf(',')
             val raw = if (commaIdx != -1) chunk.substring(commaIdx + 1) else chunk
-            val bytes = android.util.Base64.decode(raw, android.util.Base64.DEFAULT)
-            stream.write(bytes)
+            sb.append(raw)
 
             if (index >= total - 1) {
                 chunkMap.remove(transferId)
-                saveRawBytes(stream.toByteArray(), fileName, mimeType)
+                val fullBase64 = sb.toString()
+                val bytes = android.util.Base64.decode(fullBase64, android.util.Base64.DEFAULT)
+                saveRawBytes(bytes, fileName, mimeType)
             }
         } catch (e: Exception) {
             Log.e("IAmaxBridge", "Error saving chunk: ${e.message}", e)
