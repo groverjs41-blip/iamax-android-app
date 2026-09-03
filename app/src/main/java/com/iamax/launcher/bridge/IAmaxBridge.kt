@@ -401,24 +401,33 @@ class IAmaxBridge(
         }
     }
 
-    private val chunkMap = java.util.concurrent.ConcurrentHashMap<String, java.lang.StringBuilder>()
+    private val fileTransferMap = java.util.concurrent.ConcurrentHashMap<String, java.io.File>()
 
     @JavascriptInterface
     fun saveBase64Chunk(transferId: String, index: Int, total: Int, chunk: String, fileName: String, mimeType: String) {
         try {
-            val sb = chunkMap.getOrPut(transferId) { java.lang.StringBuilder() }
+            val tempFile = fileTransferMap.getOrPut(transferId) {
+                java.io.File(activity.cacheDir, "transfer_${transferId}.tmp").apply {
+                    if (exists()) delete()
+                }
+            }
             val commaIdx = chunk.indexOf(',')
             val raw = if (commaIdx != -1) chunk.substring(commaIdx + 1) else chunk
-            sb.append(raw)
+            if (raw.isNotBlank()) {
+                val decoded = android.util.Base64.decode(raw, android.util.Base64.DEFAULT)
+                java.io.FileOutputStream(tempFile, true).use { fos ->
+                    fos.write(decoded)
+                }
+            }
 
             if (index >= total - 1) {
-                chunkMap.remove(transferId)
-                val fullBase64 = sb.toString()
-                val bytes = android.util.Base64.decode(fullBase64, android.util.Base64.DEFAULT)
-                saveRawBytes(bytes, fileName, mimeType)
+                fileTransferMap.remove(transferId)
+                activity.runOnUiThread {
+                    (activity as? MainActivity)?.promptUserWhereToSave(tempFile, fileName, mimeType)
+                }
             }
-        } catch (e: Exception) {
-            Log.e("IAmaxBridge", "Error saving chunk: ${e.message}", e)
+        } catch (t: Throwable) {
+            Log.e("IAmaxBridge", "Error saving chunk: ${t.message}", t)
         }
     }
 
@@ -427,27 +436,30 @@ class IAmaxBridge(
         try {
             val commaIdx = base64Data.indexOf(',')
             val rawBase64 = if (commaIdx != -1) base64Data.substring(commaIdx + 1) else base64Data
-            val bytes = android.util.Base64.decode(rawBase64, android.util.Base64.DEFAULT)
-            saveRawBytes(bytes, fileName, mimeType)
-        } catch (e: Exception) {
-            Log.e("IAmaxBridge", "Error saving base64 file: ${e.message}", e)
+            val decoded = android.util.Base64.decode(rawBase64, android.util.Base64.DEFAULT)
+            val tempFile = java.io.File(activity.cacheDir, "b64_${System.currentTimeMillis()}.tmp")
+            tempFile.outputStream().use { it.write(decoded) }
             activity.runOnUiThread {
-                Toast.makeText(activity, "Error al guardar archivo: ${e.message}", Toast.LENGTH_SHORT).show()
+                (activity as? MainActivity)?.promptUserWhereToSave(tempFile, fileName, mimeType)
+            }
+        } catch (t: Throwable) {
+            Log.e("IAmaxBridge", "Error saving base64 file: ${t.message}", t)
+            activity.runOnUiThread {
+                Toast.makeText(activity, "Error al guardar archivo: ${t.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-    private fun saveRawBytes(bytes: ByteArray, fileName: String, mimeType: String) {
-        activity.runOnUiThread {
-            (activity as? MainActivity)?.promptUserWhereToSave(bytes, fileName, mimeType)
-        }
-    }
-
     @JavascriptInterface
-    fun downloadHttpFile(urlStr: String, fileNameStr: String, mimeTypeStr: String) {
+    fun downloadHttpFile(urlStr: String, fileNameStr: String, mimeTypeStr: String, refererStr: String? = null) {
         if (urlStr.isBlank()) return
         activity.runOnUiThread {
-            (activity as? MainActivity)?.downloadUrlWithAuth(urlStr, fileNameStr, mimeTypeStr)
+            (activity as? MainActivity)?.downloadUrlWithAuth(
+                url = urlStr,
+                suggestedName = fileNameStr,
+                mimeType = mimeTypeStr,
+                referer = refererStr
+            )
         }
     }
 

@@ -41,6 +41,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.File
+import java.util.UUID
 
 class MainActivity : AppCompatActivity() {
 
@@ -81,6 +83,7 @@ class MainActivity : AppCompatActivity() {
         fileUploadCallback = null
     }
 
+    private var pendingDownloadFile: File? = null
     private var pendingDownloadData: ByteArray? = null
     private var pendingDownloadFileName: String = ""
     private var pendingDownloadMimeType: String = ""
@@ -88,14 +91,21 @@ class MainActivity : AppCompatActivity() {
     private val createDocumentLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("*/*")
     ) { uri: Uri? ->
+        val file = pendingDownloadFile
         val data = pendingDownloadData
         val fileName = pendingDownloadFileName
         val mime = pendingDownloadMimeType
-        if (uri != null && data != null && data.isNotEmpty()) {
+        if (uri != null) {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     contentResolver.openOutputStream(uri)?.use { os ->
-                        os.write(data)
+                        if (file != null && file.exists()) {
+                            file.inputStream().use { input ->
+                                input.copyTo(os)
+                            }
+                        } else if (data != null && data.isNotEmpty()) {
+                            os.write(data)
+                        }
                         os.flush()
                     }
                     withContext(Dispatchers.Main) {
@@ -108,10 +118,14 @@ class MainActivity : AppCompatActivity() {
                         Toast.makeText(this@MainActivity, "❌ Error al guardar: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
                 } finally {
+                    file?.delete()
+                    pendingDownloadFile = null
                     pendingDownloadData = null
                 }
             }
         } else {
+            file?.delete()
+            pendingDownloadFile = null
             pendingDownloadData = null
         }
     }
@@ -221,30 +235,37 @@ class MainActivity : AppCompatActivity() {
                             fetch(blobUrl)
                                 .then(function(r) { return r.blob(); })
                                 .then(function(blob) {
-                                    var reader = new FileReader();
-                                    reader.onloadend = function() {
-                                        var b64 = reader.result || '';
-                                        var commaIdx = b64.indexOf(',');
-                                        var clean = commaIdx !== -1 ? b64.substring(commaIdx + 1) : b64;
-                                        if (clean.length > 200000 && window.AndroidBridge && typeof window.AndroidBridge.saveBase64Chunk === 'function') {
-                                            var chunkSize = 100000;
-                                            var total = Math.ceil(clean.length / chunkSize);
-                                            var tx = 'tx_' + Date.now();
-                                            var i = 0;
-                                            function sendNext() {
-                                                if (i < total) {
-                                                    var chunk = clean.substring(i * chunkSize, (i + 1) * chunkSize);
-                                                    window.AndroidBridge.saveBase64Chunk(tx, i, total, chunk, '$guessName', blob.type || '$mimeType');
-                                                    i++;
-                                                    if (i % 3 === 0) setTimeout(sendNext, 12); else sendNext();
-                                                }
+                                    var size = blob.size;
+                                    var mime = blob.type || '$mimeType';
+                                    var chunkSize = 256 * 1024;
+                                    var totalChunks = Math.ceil(size / chunkSize);
+                                    var transferId = 'tx_' + Date.now();
+                                    var chunkIndex = 0;
+
+                                    function readNext() {
+                                        if (chunkIndex >= totalChunks) return;
+                                        var start = chunkIndex * chunkSize;
+                                        var end = Math.min(start + chunkSize, size);
+                                        var slice = blob.slice(start, end);
+                                        var reader = new FileReader();
+                                        reader.onloadend = function() {
+                                            var b64 = reader.result || '';
+                                            var commaIdx = b64.indexOf(',');
+                                            var clean = commaIdx !== -1 ? b64.substring(commaIdx + 1) : b64;
+                                            if (window.AndroidBridge && typeof window.AndroidBridge.saveBase64Chunk === 'function') {
+                                                window.AndroidBridge.saveBase64Chunk(transferId, chunkIndex, totalChunks, clean, '$guessName', mime);
                                             }
-                                            sendNext();
-                                        } else if (window.AndroidBridge && typeof window.AndroidBridge.saveBase64File === 'function') {
-                                            window.AndroidBridge.saveBase64File(clean, '$guessName', blob.type || '$mimeType');
-                                        }
-                                    };
-                                    reader.readAsDataURL(blob);
+                                            chunkIndex++;
+                                            if (chunkIndex < totalChunks) {
+                                                setTimeout(readNext, 5);
+                                            }
+                                        };
+                                        reader.readAsDataURL(slice);
+                                    }
+
+                                    if (totalChunks > 0) {
+                                        readNext();
+                                    }
                                 })
                                 .catch(function(err) {
                                     console.error('Blob fetch error:', err);
@@ -256,7 +277,13 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 val fileName = URLUtil.guessFileName(url, contentDisposition, mimeType)
-                downloadUrlWithAuth(url, fileName, mimeType)
+                downloadUrlWithAuth(
+                    url = url,
+                    suggestedName = fileName,
+                    mimeType = mimeType,
+                    customUserAgent = userAgent,
+                    referer = webView.url
+                )
             } catch (e: Exception) {
                 Toast.makeText(this, "Error al descargar: ${e.message}", Toast.LENGTH_SHORT).show()
             }
@@ -370,9 +397,10 @@ class MainActivity : AppCompatActivity() {
         downloadUrlWithAuth(url, suggestedFileName, "")
     }
 
-    fun promptUserWhereToSave(bytes: ByteArray, fileName: String, mimeType: String) {
-        if (bytes.isEmpty()) {
+    fun promptUserWhereToSave(tempFile: File, fileName: String, mimeType: String) {
+        if (!tempFile.exists() || tempFile.length() == 0L) {
             Toast.makeText(this, "El archivo está vacío, no se puede guardar", Toast.LENGTH_SHORT).show()
+            tempFile.delete()
             return
         }
 
@@ -380,33 +408,54 @@ class MainActivity : AppCompatActivity() {
             try {
                 val safeName = sanitizeFileName(fileName, mimeType)
                 val resolvedMime = resolveMimeType(safeName, mimeType)
-                val sizeText = formatFileSize(bytes.size.toLong())
+                val sizeText = formatFileSize(tempFile.length())
 
                 AlertDialog.Builder(this)
                     .setTitle("📥 Descargar archivo")
                     .setMessage("$safeName\n\nTamaño: $sizeText\n\n¿Deseas guardar este archivo en Descargas?")
                     .setPositiveButton("Guardar en Descargas") { _, _ ->
-                        saveToDownloadsDir(bytes, safeName, resolvedMime)
+                        saveFileToDownloadsDir(tempFile, safeName, resolvedMime)
                     }
                     .setNeutralButton("Elegir carpeta...") { _, _ ->
-                        pendingDownloadData = bytes
+                        pendingDownloadFile = tempFile
                         pendingDownloadFileName = safeName
                         pendingDownloadMimeType = resolvedMime
                         createDocumentLauncher.launch(safeName)
                     }
-                    .setNegativeButton("Cancelar", null)
+                    .setNegativeButton("Cancelar") { _, _ ->
+                        tempFile.delete()
+                    }
+                    .setOnCancelListener {
+                        tempFile.delete()
+                    }
                     .setCancelable(true)
                     .show()
             } catch (e: Exception) {
                 Log.e("MainActivity", "Error in promptUserWhereToSave: ${e.message}", e)
-                saveToDownloadsDir(bytes, fileName, mimeType)
+                saveFileToDownloadsDir(tempFile, fileName, mimeType)
             }
         }
     }
 
-    fun saveToDownloadsDir(bytes: ByteArray, fileName: String, mimeType: String) {
+    fun promptUserWhereToSave(bytes: ByteArray, fileName: String, mimeType: String) {
         if (bytes.isEmpty()) {
+            Toast.makeText(this, "El archivo está vacío, no se puede guardar", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val tempFile = File(cacheDir, "dl_b64_${System.currentTimeMillis()}.tmp")
+        try {
+            tempFile.outputStream().use { it.write(bytes) }
+            promptUserWhereToSave(tempFile, fileName, mimeType)
+        } catch (e: Exception) {
+            saveToDownloadsDir(bytes, fileName, mimeType)
+        }
+    }
+
+    fun saveFileToDownloadsDir(sourceFile: File, fileName: String, mimeType: String) {
+        if (!sourceFile.exists() || sourceFile.length() == 0L) {
             Toast.makeText(this, "El archivo está vacío", Toast.LENGTH_SHORT).show()
+            sourceFile.delete()
             return
         }
 
@@ -427,7 +476,9 @@ class MainActivity : AppCompatActivity() {
                     val uri = contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
                     if (uri != null) {
                         contentResolver.openOutputStream(uri)?.use { os ->
-                            os.write(bytes)
+                            sourceFile.inputStream().use { input ->
+                                input.copyTo(os)
+                            }
                             os.flush()
                         }
                         values.clear()
@@ -445,9 +496,11 @@ class MainActivity : AppCompatActivity() {
                 try {
                     val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                     if (!downloadsDir.exists()) downloadsDir.mkdirs()
-                    val targetFile = java.io.File(downloadsDir, safeName)
-                    java.io.FileOutputStream(targetFile).use { fos ->
-                        fos.write(bytes)
+                    val targetFile = File(downloadsDir, safeName)
+                    targetFile.outputStream().use { fos ->
+                        sourceFile.inputStream().use { input ->
+                            input.copyTo(fos)
+                        }
                         fos.flush()
                     }
                     MediaScannerConnection.scanFile(this@MainActivity, arrayOf(targetFile.absolutePath), arrayOf(resolvedMime), null)
@@ -456,6 +509,8 @@ class MainActivity : AppCompatActivity() {
                     Log.e("MainActivity", "Direct File save error: ${e.message}", e)
                 }
             }
+
+            sourceFile.delete()
 
             withContext(Dispatchers.Main) {
                 if (savedSuccessfully) {
@@ -467,13 +522,61 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun downloadUrlWithAuth(url: String, suggestedName: String, mimeType: String) {
+    fun saveToDownloadsDir(bytes: ByteArray, fileName: String, mimeType: String) {
+        val tempFile = File(cacheDir, "dl_temp_${System.currentTimeMillis()}.tmp")
+        try {
+            tempFile.outputStream().use { it.write(bytes) }
+            saveFileToDownloadsDir(tempFile, fileName, mimeType)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Save bytes error: ${e.message}", e)
+        }
+    }
+
+    private fun downloadViaDownloadManager(
+        url: String,
+        fileName: String,
+        mimeType: String,
+        userAgent: String,
+        cookies: String,
+        referer: String
+    ) {
+        try {
+            val safeName = sanitizeFileName(fileName, mimeType)
+            val request = DownloadManager.Request(Uri.parse(url)).apply {
+                if (userAgent.isNotBlank()) addRequestHeader("User-Agent", userAgent)
+                if (cookies.isNotBlank()) addRequestHeader("Cookie", cookies)
+                if (referer.isNotBlank()) addRequestHeader("Referer", referer)
+                setTitle(safeName)
+                setDescription("Descargando archivo...")
+                setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, safeName)
+            }
+            val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            dm.enqueue(request)
+            runOnUiThread {
+                Toast.makeText(this, "⬇️ Descarga iniciada en segundo plano: $safeName", Toast.LENGTH_LONG).show()
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "DownloadManager error: ${e.message}", e)
+            runOnUiThread {
+                Toast.makeText(this, "Error al descargar: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun downloadUrlWithAuth(
+        url: String,
+        suggestedName: String,
+        mimeType: String,
+        customUserAgent: String? = null,
+        referer: String? = null
+    ) {
         if (url.startsWith("data:")) {
             try {
                 val commaIdx = url.indexOf(',')
                 val raw = if (commaIdx != -1) url.substring(commaIdx + 1) else url
                 val bytes = android.util.Base64.decode(raw, android.util.Base64.DEFAULT)
-                val guessedName = if (suggestedName.isNotBlank()) suggestedName else "imagen_${System.currentTimeMillis()}.png"
+                val guessedName = if (suggestedName.isNotBlank()) suggestedName else "archivo_${System.currentTimeMillis()}"
                 promptUserWhereToSave(bytes, guessedName, mimeType)
             } catch (e: Exception) {
                 Toast.makeText(this, "Error al procesar datos: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -487,10 +590,34 @@ class MainActivity : AppCompatActivity() {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@MainActivity, "Descargando: $initialName...", Toast.LENGTH_SHORT).show()
                 }
-                val cookies = CookieManager.getInstance().getCookie(url) ?: ""
+
+                val currentWebUrl = referer ?: binding.toolWebView.url ?: ""
+                val effectiveUa = when {
+                    !customUserAgent.isNullOrBlank() -> customUserAgent
+                    binding.toolWebView.settings.userAgentString.isNotBlank() -> binding.toolWebView.settings.userAgentString
+                    else -> cleanMobileUserAgent
+                }
+
+                val cookieManager = CookieManager.getInstance()
+                val cookiesForUrl = cookieManager.getCookie(url) ?: ""
+                val cookiesForPage = if (currentWebUrl.isNotBlank()) cookieManager.getCookie(currentWebUrl) ?: "" else ""
+                val cookies = if (cookiesForUrl.isNotBlank()) cookiesForUrl else cookiesForPage
+
                 val reqBuilder = Request.Builder()
                     .url(url)
-                    .addHeader("User-Agent", cleanMobileUserAgent)
+                    .addHeader("User-Agent", effectiveUa)
+                    .addHeader("Accept", "*/*")
+                    .addHeader("Accept-Language", "es-ES,es;q=0.9,en;q=0.8")
+
+                if (currentWebUrl.isNotBlank()) {
+                    reqBuilder.addHeader("Referer", currentWebUrl)
+                    try {
+                        val refUri = Uri.parse(currentWebUrl)
+                        val origin = "${refUri.scheme}://${refUri.authority}"
+                        reqBuilder.addHeader("Origin", origin)
+                    } catch (_: Exception) {}
+                }
+
                 if (cookies.isNotBlank()) {
                     reqBuilder.addHeader("Cookie", cookies)
                 }
@@ -501,28 +628,52 @@ class MainActivity : AppCompatActivity() {
                 if (!response.isSuccessful && (response.code in listOf(400, 401, 403)) && cookies.isNotBlank()) {
                     val retryReq = Request.Builder()
                         .url(url)
-                        .addHeader("User-Agent", cleanMobileUserAgent)
-                        .build()
-                    response = httpClient.newCall(retryReq).execute()
+                        .addHeader("User-Agent", effectiveUa)
+                        .addHeader("Accept", "*/*")
+                    if (currentWebUrl.isNotBlank()) {
+                        retryReq.addHeader("Referer", currentWebUrl)
+                    }
+                    response = httpClient.newCall(retryReq.build()).execute()
                 }
 
+                // Si falla OkHttp (403, 401, etc.), usar DownloadManager nativo de Android
                 if (!response.isSuccessful) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(this@MainActivity, "Error en descarga (${response.code})", Toast.LENGTH_SHORT).show()
+                    Log.w("MainActivity", "OkHttp returned ${response.code}, falling back to DownloadManager")
+                    val fallbackName = if (suggestedName.isNotBlank() && suggestedName.contains(".")) {
+                        suggestedName
+                    } else {
+                        URLUtil.guessFileName(url, null, mimeType)
                     }
+                    downloadViaDownloadManager(url, fallbackName, mimeType, effectiveUa, cookies, currentWebUrl)
                     return@launch
                 }
-                val bytes = response.body?.bytes() ?: return@launch
+
                 val headerDisposition = response.header("Content-Disposition")
+                val respMime = response.header("Content-Type") ?: mimeType
                 val finalName = if (suggestedName.isNotBlank() && suggestedName.contains(".")) {
                     suggestedName
                 } else {
-                    URLUtil.guessFileName(url, headerDisposition, response.header("Content-Type") ?: mimeType)
+                    URLUtil.guessFileName(url, headerDisposition, respMime)
                 }
-                val respMime = response.header("Content-Type") ?: mimeType
+
+                // Streaming directo a archivo temporal en disco (0 MB de RAM ocupada)
+                val tempFile = File(cacheDir, "dl_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(6)}.tmp")
+                response.body?.byteStream()?.use { input ->
+                    tempFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+
+                if (!tempFile.exists() || tempFile.length() == 0L) {
+                    tempFile.delete()
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "Archivo descargado vacío", Toast.LENGTH_SHORT).show()
+                    }
+                    return@launch
+                }
 
                 withContext(Dispatchers.Main) {
-                    promptUserWhereToSave(bytes, finalName, respMime)
+                    promptUserWhereToSave(tempFile, finalName, respMime)
                 }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Download error: ${e.message}", e)

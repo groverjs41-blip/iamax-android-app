@@ -20,7 +20,7 @@
                     window.AndroidBridge.saveBase64Chunk(tx, i, total, chunk, filename || 'descarga', mime || '');
                     i++;
                     if (i % 3 === 0) {
-                        setTimeout(sendNext, 12);
+                        setTimeout(sendNext, 8);
                     } else {
                         sendNext();
                     }
@@ -36,11 +36,37 @@
         fetch(blobUrl)
             .then(function(r) { return r.blob(); })
             .then(function(blob) {
-                var reader = new FileReader();
-                reader.onloadend = function() {
-                    sendBase64(reader.result, filename, blob.type || '');
-                };
-                reader.readAsDataURL(blob);
+                var size = blob.size;
+                var mime = blob.type || '';
+                var chunkSize = 256 * 1024; // 256 KB slices
+                var totalChunks = Math.ceil(size / chunkSize);
+                var transferId = 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+                var chunkIndex = 0;
+
+                function readNextChunk() {
+                    if (chunkIndex >= totalChunks) return;
+                    var start = chunkIndex * chunkSize;
+                    var end = Math.min(start + chunkSize, size);
+                    var slice = blob.slice(start, end);
+                    var reader = new FileReader();
+                    reader.onloadend = function() {
+                        var b64 = reader.result || '';
+                        var commaIdx = b64.indexOf(',');
+                        var clean = commaIdx !== -1 ? b64.substring(commaIdx + 1) : b64;
+                        if (window.AndroidBridge && typeof window.AndroidBridge.saveBase64Chunk === 'function') {
+                            window.AndroidBridge.saveBase64Chunk(transferId, chunkIndex, totalChunks, clean, filename || 'descarga', mime);
+                        }
+                        chunkIndex++;
+                        if (chunkIndex < totalChunks) {
+                            setTimeout(readNextChunk, 4);
+                        }
+                    };
+                    reader.readAsDataURL(slice);
+                }
+
+                if (totalChunks > 0) {
+                    readNextChunk();
+                }
             })
             .catch(function(e) {
                 console.error('[IAMAX] Blob download error:', e);
@@ -57,11 +83,33 @@
             return true;
         } else if (href.startsWith('http://') || href.startsWith('https://')) {
             if (window.AndroidBridge && typeof window.AndroidBridge.downloadHttpFile === 'function') {
-                window.AndroidBridge.downloadHttpFile(href, filename || '', '');
+                window.AndroidBridge.downloadHttpFile(href, filename || '', '', window.location.href);
                 return true;
             }
         }
         return false;
+    }
+
+    function getVideoSource(video) {
+        if (!video) return null;
+        if (video.currentSrc) return video.currentSrc;
+        if (video.src) return video.src;
+        var source = video.querySelector('source');
+        if (source && (source.src || source.getAttribute('src'))) {
+            return source.src || source.getAttribute('src');
+        }
+        return null;
+    }
+
+    function getAudioSource(audio) {
+        if (!audio) return null;
+        if (audio.currentSrc) return audio.currentSrc;
+        if (audio.src) return audio.src;
+        var source = audio.querySelector('source');
+        if (source && (source.src || source.getAttribute('src'))) {
+            return source.src || source.getAttribute('src');
+        }
+        return null;
     }
 
     function findActiveAudio(target) {
@@ -70,7 +118,7 @@
         var container = target.closest('[class*="track"], [class*="song"], [class*="card"], [class*="player"], [class*="item"], [class*="row"]') || target.parentElement;
         if (container) {
             var a = container.querySelector('audio');
-            if (a && (a.currentSrc || a.src)) return a;
+            if (a && getAudioSource(a)) return a;
         }
         // 2. Any playing audio in document
         var allAudios = document.querySelectorAll('audio');
@@ -82,7 +130,7 @@
         }
         // 3. Fallback to any audio with a src
         for (var j = 0; j < allAudios.length; j++) {
-            if (allAudios[j].currentSrc || allAudios[j].src) {
+            if (getAudioSource(allAudios[j])) {
                 return allAudios[j];
             }
         }
@@ -149,15 +197,17 @@
             if (isDownloadBtn) {
                 var container = btn.closest('figure, [class*="video"], [class*="audio"], [class*="track"], [class*="song"], [class*="player"], [class*="card"], [class*="item"]') || btn.parentElement;
                 var vid = container ? container.querySelector('video') : document.querySelector('video');
-                if (vid && (vid.currentSrc || vid.src)) {
-                    processDownload(vid.currentSrc || vid.src, 'gemini_video_' + Date.now() + '.mp4');
+                var vsrc = getVideoSource(vid);
+                if (vsrc) {
+                    processDownload(vsrc, 'gemini_video_' + Date.now() + '.mp4');
                     return;
                 }
                 var aud = findActiveAudio(btn);
-                if (aud && (aud.currentSrc || aud.src)) {
+                var asrc = getAudioSource(aud);
+                if (asrc) {
                     var titleEl = container ? container.querySelector('h1, h2, h3, h4, [class*="title"], [class*="name"]') : null;
                     var aname = (titleEl ? titleEl.textContent : 'treblo_musica_' + Date.now()).trim().replace(/[^a-zA-Z0-9_-]/g, '_') + '.ogg';
-                    processDownload(aud.currentSrc || aud.src, aname);
+                    processDownload(asrc, aname);
                     return;
                 }
             }
@@ -171,8 +221,9 @@
         touchTimer = setTimeout(function() {
             // Check video
             var vid = el.closest('video') || (el.closest('figure, [class*="video"]') ? el.closest('figure, [class*="video"]').querySelector('video') : null);
-            if (vid && (vid.currentSrc || vid.src)) {
-                processDownload(vid.currentSrc || vid.src, 'gemini_video_' + Date.now() + '.mp4');
+            var vsrc = getVideoSource(vid);
+            if (vsrc) {
+                processDownload(vsrc, 'gemini_video_' + Date.now() + '.mp4');
                 return;
             }
             // Check image
@@ -183,11 +234,12 @@
             }
             // Check audio / music card
             var aud = findActiveAudio(el);
-            if (aud && (aud.currentSrc || aud.src)) {
+            var asrc = getAudioSource(aud);
+            if (asrc) {
                 var container = el.closest('[class*="track"], [class*="song"], [class*="card"], [class*="player"], [class*="item"]');
                 var titleEl = container ? container.querySelector('h1, h2, h3, h4, [class*="title"], [class*="name"]') : null;
                 var aname = (titleEl ? titleEl.textContent : 'treblo_musica_' + Date.now()).trim().replace(/[^a-zA-Z0-9_-]/g, '_') + '.ogg';
-                processDownload(aud.currentSrc || aud.src, aname);
+                processDownload(asrc, aname);
                 return;
             }
         }, 550);
@@ -203,18 +255,17 @@
     // 5. Context menu on Video & Audio
     document.addEventListener('contextmenu', function(e) {
         var video = e.target.closest('video');
-        if (video) {
-            var src = video.currentSrc || video.src;
-            if (src) {
-                e.preventDefault();
-                processDownload(src, 'gemini_video_' + Date.now() + '.mp4');
-                return;
-            }
+        var vsrc = getVideoSource(video);
+        if (vsrc) {
+            e.preventDefault();
+            processDownload(vsrc, 'gemini_video_' + Date.now() + '.mp4');
+            return;
         }
         var aud = findActiveAudio(e.target);
-        if (aud && (aud.currentSrc || aud.src)) {
+        var asrc = getAudioSource(aud);
+        if (asrc) {
             e.preventDefault();
-            processDownload(aud.currentSrc || aud.src, 'treblo_musica_' + Date.now() + '.ogg');
+            processDownload(asrc, 'treblo_musica_' + Date.now() + '.ogg');
         }
     }, true);
 })();
