@@ -89,18 +89,27 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.CreateDocument("*/*")
     ) { uri: Uri? ->
         val data = pendingDownloadData
-        if (uri != null && data != null) {
-            try {
-                contentResolver.openOutputStream(uri)?.use { os ->
-                    os.write(data)
+        val fileName = pendingDownloadFileName
+        val mime = pendingDownloadMimeType
+        if (uri != null && data != null && data.isNotEmpty()) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    contentResolver.openOutputStream(uri)?.use { os ->
+                        os.write(data)
+                        os.flush()
+                    }
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "✅ Guardado exitosamente: $fileName", Toast.LENGTH_LONG).show()
+                    }
+                    MediaScannerConnection.scanFile(this@MainActivity, arrayOf(uri.path), arrayOf(mime), null)
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Error saving document: ${e.message}", e)
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "❌ Error al guardar: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                } finally {
+                    pendingDownloadData = null
                 }
-                Toast.makeText(this, "Guardado exitosamente: $pendingDownloadFileName", Toast.LENGTH_LONG).show()
-                MediaScannerConnection.scanFile(this, arrayOf(uri.path), arrayOf(pendingDownloadMimeType), null)
-            } catch (e: Exception) {
-                Log.e("MainActivity", "Error saving document: ${e.message}", e)
-                Toast.makeText(this, "Error al guardar: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                pendingDownloadData = null
             }
         } else {
             pendingDownloadData = null
@@ -212,9 +221,25 @@ class MainActivity : AppCompatActivity() {
                                 .then(function(blob) {
                                     var reader = new FileReader();
                                     reader.onloadend = function() {
-                                        var base64data = reader.result;
-                                        if (window.AndroidBridge && typeof window.AndroidBridge.saveBase64File === 'function') {
-                                            window.AndroidBridge.saveBase64File(base64data, '$guessName', blob.type || '$mimeType');
+                                        var b64 = reader.result || '';
+                                        var commaIdx = b64.indexOf(',');
+                                        var clean = commaIdx !== -1 ? b64.substring(commaIdx + 1) : b64;
+                                        if (clean.length > 200000 && window.AndroidBridge && typeof window.AndroidBridge.saveBase64Chunk === 'function') {
+                                            var chunkSize = 100000;
+                                            var total = Math.ceil(clean.length / chunkSize);
+                                            var tx = 'tx_' + Date.now();
+                                            var i = 0;
+                                            function sendNext() {
+                                                if (i < total) {
+                                                    var chunk = clean.substring(i * chunkSize, (i + 1) * chunkSize);
+                                                    window.AndroidBridge.saveBase64Chunk(tx, i, total, chunk, '$guessName', blob.type || '$mimeType');
+                                                    i++;
+                                                    if (i % 3 === 0) setTimeout(sendNext, 12); else sendNext();
+                                                }
+                                            }
+                                            sendNext();
+                                        } else if (window.AndroidBridge && typeof window.AndroidBridge.saveBase64File === 'function') {
+                                            window.AndroidBridge.saveBase64File(clean, '$guessName', blob.type || '$mimeType');
                                         }
                                     };
                                     reader.readAsDataURL(blob);
@@ -381,31 +406,65 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun saveToDownloadsDir(bytes: ByteArray, fileName: String, mimeType: String) {
-        try {
+        if (bytes.isEmpty()) {
+            Toast.makeText(this, "El archivo está vacío", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        CoroutineScope(Dispatchers.IO).launch {
             val safeName = sanitizeFileName(fileName, mimeType)
             val resolvedMime = resolveMimeType(safeName, mimeType)
+            var savedSuccessfully = false
 
+            // 1. En Android 10+ (Q+), usar MediaStore con IS_PENDING
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                val values = android.content.ContentValues().apply {
-                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, safeName)
-                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, resolvedMime)
-                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                try {
+                    val values = android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, safeName)
+                        put(android.provider.MediaStore.MediaColumns.MIME_TYPE, resolvedMime)
+                        put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                        put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
+                    }
+                    val uri = contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    if (uri != null) {
+                        contentResolver.openOutputStream(uri)?.use { os ->
+                            os.write(bytes)
+                            os.flush()
+                        }
+                        values.clear()
+                        values.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
+                        contentResolver.update(uri, values, null, null)
+                        savedSuccessfully = true
+                    }
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "MediaStore save error: ${e.message}", e)
                 }
-                val uri = contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                if (uri != null) {
-                    contentResolver.openOutputStream(uri)?.use { os -> os.write(bytes) }
-                }
-            } else {
-                val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                dir.mkdirs()
-                val file = java.io.File(dir, safeName)
-                file.outputStream().use { os -> os.write(bytes) }
-                MediaScannerConnection.scanFile(this, arrayOf(file.absolutePath), arrayOf(resolvedMime), null)
             }
-            Toast.makeText(this, "Guardado en Descargas: $safeName", Toast.LENGTH_LONG).show()
-        } catch (e: Exception) {
-            Log.e("MainActivity", "Error saving to Downloads: ${e.message}", e)
-            Toast.makeText(this, "Error al guardar: ${e.message}", Toast.LENGTH_SHORT).show()
+
+            // 2. Fallback de guardado directo en archivo físico en Descargas
+            if (!savedSuccessfully) {
+                try {
+                    val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                    if (!downloadsDir.exists()) downloadsDir.mkdirs()
+                    val targetFile = java.io.File(downloadsDir, safeName)
+                    java.io.FileOutputStream(targetFile).use { fos ->
+                        fos.write(bytes)
+                        fos.flush()
+                    }
+                    MediaScannerConnection.scanFile(this@MainActivity, arrayOf(targetFile.absolutePath), arrayOf(resolvedMime), null)
+                    savedSuccessfully = true
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Direct File save error: ${e.message}", e)
+                }
+            }
+
+            withContext(Dispatchers.Main) {
+                if (savedSuccessfully) {
+                    Toast.makeText(this@MainActivity, "✅ Guardado en Descargas: $safeName", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this@MainActivity, "❌ Error al guardar archivo", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
@@ -436,7 +495,18 @@ class MainActivity : AppCompatActivity() {
                 if (cookies.isNotBlank()) {
                     reqBuilder.addHeader("Cookie", cookies)
                 }
-                val response = httpClient.newCall(reqBuilder.build()).execute()
+
+                var response = httpClient.newCall(reqBuilder.build()).execute()
+
+                // Si un servidor CDN/S3 rechaza por cookies, reintentar sin cookies
+                if (!response.isSuccessful && (response.code in listOf(400, 401, 403)) && cookies.isNotBlank()) {
+                    val retryReq = Request.Builder()
+                        .url(url)
+                        .addHeader("User-Agent", cleanMobileUserAgent)
+                        .build()
+                    response = httpClient.newCall(retryReq).execute()
+                }
+
                 if (!response.isSuccessful) {
                     withContext(Dispatchers.Main) {
                         Toast.makeText(this@MainActivity, "Error en descarga (${response.code})", Toast.LENGTH_SHORT).show()

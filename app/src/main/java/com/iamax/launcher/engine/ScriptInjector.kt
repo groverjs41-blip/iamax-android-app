@@ -94,42 +94,25 @@ class ScriptInjector(private val context: Context) {
      */
     fun injectPendingStorage(webView: WebView, lsJson: String?, ssJson: String?) {
         if (lsJson.isNullOrBlank() && ssJson.isNullOrBlank()) return
-        val base64Ls = android.util.Base64.encodeToString((lsJson ?: "{}").toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
-        val base64Ss = android.util.Base64.encodeToString((ssJson ?: "{}").toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
+        val safeLs = (lsJson ?: "{}").replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "")
+        val safeSs = (ssJson ?: "{}").replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "")
 
         val js = """
             (function() {
-                var injectedAny = false;
                 try {
-                    var rawLs = decodeURIComponent(escape(atob('$base64Ls')));
-                    var ls = JSON.parse(rawLs);
+                    var ls = JSON.parse('$safeLs');
                     for (var k in ls) {
                         if (k !== '_iamax_final_url') {
-                            var val = typeof ls[k] === 'string' ? ls[k] : JSON.stringify(ls[k]);
-                            localStorage.setItem(k, val);
-                            injectedAny = true;
+                            localStorage.setItem(k, ls[k]);
                         }
                     }
-                } catch(e) { console.error('LS inject error:', e); }
-
+                } catch(e) {}
                 try {
-                    var rawSs = decodeURIComponent(escape(atob('$base64Ss')));
-                    var ss = JSON.parse(rawSs);
+                    var ss = JSON.parse('$safeSs');
                     for (var k in ss) {
-                        var val = typeof ss[k] === 'string' ? ss[k] : JSON.stringify(ss[k]);
-                        sessionStorage.setItem(k, val);
-                        injectedAny = true;
+                        sessionStorage.setItem(k, ss[k]);
                     }
-                } catch(e) { console.error('SS inject error:', e); }
-
-                // Si se inyectaron claves en ChatGPT u OpenAI y aún no se ha recargado la SPA
-                if (injectedAny && !window.__iamax_storage_reloaded) {
-                    var href = window.location.href.toLowerCase();
-                    if (href.includes('chatgpt.com') || href.includes('openai.com')) {
-                        window.__iamax_storage_reloaded = true;
-                        setTimeout(function() { window.location.reload(); }, 250);
-                    }
-                }
+                } catch(e) {}
             })();
         """.trimIndent()
 

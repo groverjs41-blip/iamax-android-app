@@ -9,14 +9,24 @@
         var commaIdx = base64data.indexOf(',');
         var cleanData = commaIdx !== -1 ? base64data.substring(commaIdx + 1) : base64data;
 
-        if (cleanData.length > 250000 && typeof window.AndroidBridge.saveBase64Chunk === 'function') {
-            var chunkSize = 150000;
+        if (cleanData.length > 200000 && typeof window.AndroidBridge.saveBase64Chunk === 'function') {
+            var chunkSize = 100000;
             var total = Math.ceil(cleanData.length / chunkSize);
             var tx = 'tx_' + Date.now();
-            for (var i = 0; i < total; i++) {
-                var chunk = cleanData.substring(i * chunkSize, (i + 1) * chunkSize);
-                window.AndroidBridge.saveBase64Chunk(tx, i, total, chunk, filename || 'descarga', mime || '');
+            var i = 0;
+            function sendNext() {
+                if (i < total) {
+                    var chunk = cleanData.substring(i * chunkSize, (i + 1) * chunkSize);
+                    window.AndroidBridge.saveBase64Chunk(tx, i, total, chunk, filename || 'descarga', mime || '');
+                    i++;
+                    if (i % 3 === 0) {
+                        setTimeout(sendNext, 12);
+                    } else {
+                        sendNext();
+                    }
+                }
             }
+            sendNext();
         } else if (typeof window.AndroidBridge.saveBase64File === 'function') {
             window.AndroidBridge.saveBase64File(cleanData, filename || 'descarga', mime || '');
         }
@@ -81,7 +91,7 @@
         return origOpen.apply(this, arguments);
     };
 
-    // 3. Intercept clicks on explicit download links and media buttons
+    // 3. Intercept user clicks on explicit download links
     document.addEventListener('click', function(e) {
         var a = e.target.closest('a');
         if (a && a.href) {
@@ -95,6 +105,29 @@
                 if (processDownload(href, filename)) {
                     e.preventDefault();
                     e.stopPropagation();
+                    return;
+                }
+            }
+        }
+
+        // Detect clicks on download buttons near video or audio elements (Gemini video download icon, Treblo audio card)
+        var btn = e.target.closest('button, [role="button"], [aria-label*="descargar" i], [aria-label*="download" i], [title*="descargar" i], [title*="download" i]');
+        if (btn) {
+            var container = btn.closest('figure, [class*="video"], [class*="audio"], [class*="track"], [class*="player"], [class*="card"]') || btn.parentElement;
+            if (container) {
+                var vid = container.querySelector('video');
+                if (vid && (vid.currentSrc || vid.src)) {
+                    var vsrc = vid.currentSrc || vid.src;
+                    processDownload(vsrc, 'gemini_video_' + Date.now() + '.mp4');
+                    return;
+                }
+                var aud = container.querySelector('audio');
+                if (aud && (aud.currentSrc || aud.src)) {
+                    var asrc = aud.currentSrc || aud.src;
+                    var titleEl = container.querySelector('h1, h2, h3, h4, [class*="title"], [class*="name"]');
+                    var aname = (titleEl ? titleEl.textContent : 'treblo_audio_' + Date.now()).trim().replace(/[^a-zA-Z0-9_-]/g, '_') + '.ogg';
+                    processDownload(asrc, aname);
+                    return;
                 }
             }
         }

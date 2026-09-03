@@ -135,6 +135,9 @@ class CookieInjector {
             val rootUrl = "https://$domainClean/"
             cookieManager.setCookie(rootUrl, cookieStr)
         }
+        if (!fallbackUrl.isNullOrBlank() && fallbackUrl != targetUrl) {
+            cookieManager.setCookie(fallbackUrl, cookieStr)
+        }
     }
 
     private fun injectRawCookie(rawCookie: String, targetUrl: String?) {

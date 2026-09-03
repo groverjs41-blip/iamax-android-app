@@ -152,8 +152,10 @@ class IAmaxBridge(
                         sessionStorage.setString("activeCardId", cardId)
                     }
 
-                    // Aislamiento completo: cada perfil (ChatGPT 1, 2, 3, Google, etc.) debe tener su propia sesión limpia
-                    clearToolStorageAndSession(targetUrl, loginMethod)
+                    val lowerUrl = targetUrl.lowercase()
+                    if (loginMethod.equals("google", ignoreCase = true) || lowerUrl.contains("accounts.google.") || lowerUrl.contains("banana")) {
+                        clearToolStorageAndSession(targetUrl, loginMethod)
+                    }
 
                     var cookiesJson = ""
                     var lsJson = ""
