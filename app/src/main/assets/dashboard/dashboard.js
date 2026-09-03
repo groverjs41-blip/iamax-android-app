@@ -1211,8 +1211,10 @@ async function forceLogin(message = SESSION_EXPIRED_MESSAGE) {
   if (countdownInterval) clearInterval(countdownInterval);
 
   const loginOverlay = document.getElementById("loginOverlay");
-  const loginError = document.getElementById("unifiedLoginError");
-  if (loginOverlay) loginOverlay.style.display = "flex";
+  if (loginOverlay) {
+    loginOverlay.classList.remove("hidden");
+    loginOverlay.style.display = "flex";
+  }
   if (loginError) {
     loginError.textContent = message;
     loginError.style.display = "block";
@@ -2897,6 +2899,7 @@ async function bootstrap() {
     ]).catch(() => {});
     if (unifiedPasswordInput) unifiedPasswordInput.value = "";
 
+    loginOverlay.classList.add("hidden");
     loginOverlay.style.display = "none";
     await loadDashboard();
   };
@@ -2916,6 +2919,7 @@ async function bootstrap() {
 
     if (ownerToken) {
       try {
+        loginOverlay.classList.add("hidden");
         loginOverlay.style.display = "none";
         await loadDashboard();
         return;
@@ -2925,6 +2929,7 @@ async function bootstrap() {
     }
 
     // Sin sesión: formulario completo. Solo se prellena el correo.
+    loginOverlay.classList.remove("hidden");
     loginOverlay.style.display = "flex";
     showFullLoginForm();
     fillSavedCredentials();

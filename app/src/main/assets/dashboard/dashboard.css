@@ -4036,18 +4036,27 @@ body.client-dashboard:not(.is-owner-session) .iamax-card.kaizen-style .report-bt
    MOBILE RESPONSIVE ENHANCEMENTS: LOGIN & TOUCH ACCESSIBILITY
    ========================================================================== */
 
+.login-overlay.hidden,
+.login-overlay[style*="display: none"],
+.login-overlay[style*="display:none"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 @media (max-width: 768px) {
   /* 1. Login Overlay centrado y adaptable en celulares */
   .login-overlay {
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: flex-start !important;
-    align-items: center !important;
-    min-height: 100vh !important;
-    padding: 16px 12px 32px !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    box-sizing: border-box !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px 12px 32px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
   }
 
   /* Compactar el panel superior de marca en celular */
