@@ -128,6 +128,8 @@ class MainActivity : AppCompatActivity() {
         scriptInjector = ScriptInjector(this)
         credentialInjectorService = CredentialInjectorService(this, sessionStorage)
 
+        checkStoragePermissions()
+
         bridge = IAmaxBridge(
             activity = this,
             sessionStorage = sessionStorage,
@@ -369,34 +371,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun promptUserWhereToSave(bytes: ByteArray, fileName: String, mimeType: String) {
+        if (bytes.isEmpty()) {
+            Toast.makeText(this, "El archivo está vacío, no se puede guardar", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         runOnUiThread {
             try {
                 val safeName = sanitizeFileName(fileName, mimeType)
                 val resolvedMime = resolveMimeType(safeName, mimeType)
                 val sizeText = formatFileSize(bytes.size.toLong())
 
-                val options = arrayOf(
-                    "📁 Elegir carpeta (Selector de Android)...",
-                    "📥 Guardar directo en Descargas"
-                )
-
                 AlertDialog.Builder(this)
-                    .setTitle("Guardar archivo")
-                    .setMessage("Archivo: $safeName\nTamaño: $sizeText\n\n¿Dónde deseas guardar el archivo?")
-                    .setItems(options) { _, which ->
-                        when (which) {
-                            0 -> {
-                                pendingDownloadData = bytes
-                                pendingDownloadFileName = safeName
-                                pendingDownloadMimeType = resolvedMime
-                                createDocumentLauncher.launch(safeName)
-                            }
-                            1 -> {
-                                saveToDownloadsDir(bytes, safeName, resolvedMime)
-                            }
-                        }
+                    .setTitle("📥 Descargar archivo")
+                    .setMessage("$safeName\n\nTamaño: $sizeText\n\n¿Deseas guardar este archivo en Descargas?")
+                    .setPositiveButton("Guardar en Descargas") { _, _ ->
+                        saveToDownloadsDir(bytes, safeName, resolvedMime)
+                    }
+                    .setNeutralButton("Elegir carpeta...") { _, _ ->
+                        pendingDownloadData = bytes
+                        pendingDownloadFileName = safeName
+                        pendingDownloadMimeType = resolvedMime
+                        createDocumentLauncher.launch(safeName)
                     }
                     .setNegativeButton("Cancelar", null)
+                    .setCancelable(true)
                     .show()
             } catch (e: Exception) {
                 Log.e("MainActivity", "Error in promptUserWhereToSave: ${e.message}", e)
@@ -686,6 +685,15 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+    }
+
+    private fun checkStoragePermissions() {
+        if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.P) {
+            val writePermission = android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+            if (checkSelfPermission(writePermission) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(writePermission, android.Manifest.permission.READ_EXTERNAL_STORAGE), 101)
+            }
+        }
     }
 
     override fun onDestroy() {

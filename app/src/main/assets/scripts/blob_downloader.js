@@ -64,6 +64,31 @@
         return false;
     }
 
+    function findActiveAudio(target) {
+        if (!target) return null;
+        // 1. In target's closest container
+        var container = target.closest('[class*="track"], [class*="song"], [class*="card"], [class*="player"], [class*="item"], [class*="row"]') || target.parentElement;
+        if (container) {
+            var a = container.querySelector('audio');
+            if (a && (a.currentSrc || a.src)) return a;
+        }
+        // 2. Any playing audio in document
+        var allAudios = document.querySelectorAll('audio');
+        for (var i = 0; i < allAudios.length; i++) {
+            var aud = allAudios[i];
+            if (!aud.paused || aud.currentTime > 0) {
+                return aud;
+            }
+        }
+        // 3. Fallback to any audio with a src
+        for (var j = 0; j < allAudios.length; j++) {
+            if (allAudios[j].currentSrc || allAudios[j].src) {
+                return allAudios[j];
+            }
+        }
+        return null;
+    }
+
     // 1. Hook HTMLAnchorElement.prototype.click (Catches FileSaver.js, Treblo OGG/MP3 dynamic downloads, and libraries)
     var origClick = HTMLAnchorElement.prototype.click;
     HTMLAnchorElement.prototype.click = function() {
@@ -91,8 +116,9 @@
         return origOpen.apply(this, arguments);
     };
 
-    // 3. Intercept user clicks on explicit download links
+    // 3. Intercept user clicks on explicit download links or buttons
     document.addEventListener('click', function(e) {
+        // A) Anchor with download
         var a = e.target.closest('a');
         if (a && a.href) {
             var href = a.href;
@@ -110,49 +136,61 @@
             }
         }
 
-        // Detect clicks on download buttons near video or audio elements (Gemini video download icon, Treblo audio card)
-        var btn = e.target.closest('button, [role="button"], [aria-label*="descargar" i], [aria-label*="download" i], [title*="descargar" i], [title*="download" i]');
+        // B) Buttons for download (Gemini video icon, Treblo audio card download button)
+        var btn = e.target.closest('button, [role="button"], a, [class*="download"], [class*="descargar"], [aria-label*="download" i], [aria-label*="descargar" i], [title*="download" i], [title*="descargar" i]');
         if (btn) {
-            var container = btn.closest('figure, [class*="video"], [class*="audio"], [class*="track"], [class*="player"], [class*="card"]') || btn.parentElement;
-            if (container) {
-                var vid = container.querySelector('video');
+            var text = (btn.textContent || '').toLowerCase();
+            var aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+            var titleAttr = (btn.getAttribute('title') || '').toLowerCase();
+            var isDownloadBtn = text.includes('download') || text.includes('descargar') || text.includes('bajar') ||
+                                text.includes('ogg') || text.includes('mp3') || text.includes('wav') ||
+                                aria.includes('download') || aria.includes('descargar') ||
+                                titleAttr.includes('download') || titleAttr.includes('descargar');
+            if (isDownloadBtn) {
+                var container = btn.closest('figure, [class*="video"], [class*="audio"], [class*="track"], [class*="song"], [class*="player"], [class*="card"], [class*="item"]') || btn.parentElement;
+                var vid = container ? container.querySelector('video') : document.querySelector('video');
                 if (vid && (vid.currentSrc || vid.src)) {
-                    var vsrc = vid.currentSrc || vid.src;
-                    processDownload(vsrc, 'gemini_video_' + Date.now() + '.mp4');
+                    processDownload(vid.currentSrc || vid.src, 'gemini_video_' + Date.now() + '.mp4');
                     return;
                 }
-                var aud = container.querySelector('audio');
+                var aud = findActiveAudio(btn);
                 if (aud && (aud.currentSrc || aud.src)) {
-                    var asrc = aud.currentSrc || aud.src;
-                    var titleEl = container.querySelector('h1, h2, h3, h4, [class*="title"], [class*="name"]');
-                    var aname = (titleEl ? titleEl.textContent : 'treblo_audio_' + Date.now()).trim().replace(/[^a-zA-Z0-9_-]/g, '_') + '.ogg';
-                    processDownload(asrc, aname);
+                    var titleEl = container ? container.querySelector('h1, h2, h3, h4, [class*="title"], [class*="name"]') : null;
+                    var aname = (titleEl ? titleEl.textContent : 'treblo_musica_' + Date.now()).trim().replace(/[^a-zA-Z0-9_-]/g, '_') + '.ogg';
+                    processDownload(aud.currentSrc || aud.src, aname);
                     return;
                 }
             }
         }
     }, true);
 
-    // 4. Long press on Video or Audio (allows downloading Gemini videos and Treblo audio by holding down)
+    // 4. Long press on Video, Image or Audio (allows holding down on Gemini videos and Treblo audio cards)
     var touchTimer = null;
     document.addEventListener('touchstart', function(e) {
-        var video = e.target.closest('video');
-        var audio = e.target.closest('audio');
-        var media = video || audio;
-        if (media) {
-            touchTimer = setTimeout(function() {
-                var src = media.currentSrc || media.src;
-                if (!src) {
-                    var source = media.querySelector('source');
-                    if (source) src = source.src;
-                }
-                if (src) {
-                    var ext = video ? '.mp4' : '.ogg';
-                    var name = (video ? 'gemini_video_' : 'treblo_audio_') + Date.now() + ext;
-                    processDownload(src, name);
-                }
-            }, 600);
-        }
+        var el = e.target;
+        touchTimer = setTimeout(function() {
+            // Check video
+            var vid = el.closest('video') || (el.closest('figure, [class*="video"]') ? el.closest('figure, [class*="video"]').querySelector('video') : null);
+            if (vid && (vid.currentSrc || vid.src)) {
+                processDownload(vid.currentSrc || vid.src, 'gemini_video_' + Date.now() + '.mp4');
+                return;
+            }
+            // Check image
+            var img = el.closest('img');
+            if (img && img.src && !img.src.startsWith('data:image/svg')) {
+                processDownload(img.src, 'imagen_' + Date.now() + '.png');
+                return;
+            }
+            // Check audio / music card
+            var aud = findActiveAudio(el);
+            if (aud && (aud.currentSrc || aud.src)) {
+                var container = el.closest('[class*="track"], [class*="song"], [class*="card"], [class*="player"], [class*="item"]');
+                var titleEl = container ? container.querySelector('h1, h2, h3, h4, [class*="title"], [class*="name"]') : null;
+                var aname = (titleEl ? titleEl.textContent : 'treblo_musica_' + Date.now()).trim().replace(/[^a-zA-Z0-9_-]/g, '_') + '.ogg';
+                processDownload(aud.currentSrc || aud.src, aname);
+                return;
+            }
+        }, 550);
     }, { passive: true });
 
     document.addEventListener('touchend', function() {
@@ -162,19 +200,21 @@
         if (touchTimer) clearTimeout(touchTimer);
     }, { passive: true });
 
-    // 5. Context menu on Video
+    // 5. Context menu on Video & Audio
     document.addEventListener('contextmenu', function(e) {
         var video = e.target.closest('video');
         if (video) {
             var src = video.currentSrc || video.src;
-            if (!src) {
-                var source = video.querySelector('source');
-                if (source) src = source.src;
-            }
             if (src) {
                 e.preventDefault();
                 processDownload(src, 'gemini_video_' + Date.now() + '.mp4');
+                return;
             }
+        }
+        var aud = findActiveAudio(e.target);
+        if (aud && (aud.currentSrc || aud.src)) {
+            e.preventDefault();
+            processDownload(aud.currentSrc || aud.src, 'treblo_musica_' + Date.now() + '.ogg');
         }
     }, true);
 })();
